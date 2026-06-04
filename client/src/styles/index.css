@@ -1,0 +1,314 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800;900&family=VT323&family=Fredoka:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+@import "./tokens.css";
+
+@theme {
+  /* =====================================================================
+     Legacy v1 tokens — DO NOT REMOVE.
+     193 existing references across HomePage / DesignerPage / ControlPanel /
+     PaletteSidebar / StatsPanel / App rely on these class names.
+     ===================================================================== */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-brand-purple: #522756;
+  --color-brand-purple-light: #6b3470;
+  --color-brand-purple-dark: #3d1c40;
+  --color-brand-blush: #FCDFE5;
+  --color-brand-blush-light: #FEF0F3;
+  --color-brand-rose: #FFB2BE;
+  --color-brand-rose-dark: #F8899B;
+  --color-brand-sky: #BBE4F8;
+  --color-brand-sky-light: #E0F2FE;
+  --color-brand-peach: #FFDFCA;
+  --color-brand-peach-light: #FFF0E6;
+
+  --color-surface: #FFFBFC;
+  --color-surface-warm: #FEF7F8;
+  --color-text-primary: #2D1230;
+  --color-text-secondary: #6B5A6E;
+  --color-text-muted: #A8949C;
+  --color-border: #F0E0E5;
+  --color-border-light: #F8EFF2;
+
+  /* =====================================================================
+     Fusiey v2 — Pixel-art kawaii design system.
+     See docs/DESIGN_SYSTEM.md. Prefer these tokens for new UI work.
+     ===================================================================== */
+
+  /* ---------- Fonts (v2) ---------- */
+  --font-display: "Press Start 2P", ui-monospace, monospace;
+  --font-pixel:   "Pixelify Sans", "Press Start 2P", monospace;
+  --font-body:    "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-cute:    "Fredoka", "Nunito", sans-serif;
+  --font-pixel-mono: "VT323", ui-monospace, monospace;
+
+  /* ---------- Ink (plum outlines + text) ---------- */
+  --color-ink: #572C5F;
+  --color-ink-deep: #522756;
+  --color-ink-soft: #653366;
+  --color-ink-hint: #8F6A93;
+
+  /* ---------- Surfaces ---------- */
+  --color-blush: #FCDFE5;
+  --color-blush-soft: #FDE1EC;
+  --color-blush-deep: #FAB3BB;
+  --color-paper: #FFFFFF;
+  --color-paper-warm: #FDF7F6;
+  --color-cream: #FFF9F0;
+
+  /* ---------- Candy pastels ---------- */
+  --color-cotton: #F7A5B8;
+  --color-cotton-hi: #FEB0BF;
+  --color-peach-candy: #FDC6A9;
+  --color-butter: #FFF4C0;
+  --color-mint: #B8DFCA;
+  --color-sky-candy: #AFDCEB;
+  --color-lilac: #E1B8DF;
+
+  /* ---------- Semantic (v2) ---------- */
+  --color-accent: #F7A5B8;
+  --color-accent-hover: #EF95AA;
+  --color-success: #B8DFCA;
+  --color-warning: #FDC6A9;
+  --color-info: #AFDCEB;
+  --color-highlight: #FFF4C0;
+  --color-border-soft: #D8B9DB;
+
+  /* ---------- MARD-221 Bead Palette (v2 hex — for UI preview styling) ----
+     ⚠️  These MAY DIVERGE from client/src/constants/palettes.ts.
+         palettes.ts remains source of truth for pattern generation + orders.
+         Sync palettes.ts to these values only after explicit decision.
+     --------------------------------------------------------------------- */
+  --color-bead-A4:  #FFDC3A;  --color-bead-A6:  #FF9A3A;  --color-bead-A7:  #E46A1A;
+  --color-bead-A10: #FFB34A;  --color-bead-A11: #FFD89A;  --color-bead-A13: #F7B88A;
+  --color-bead-B3:  #B8E38E;  --color-bead-B5:  #5FB86A;  --color-bead-B8:  #2E7A44;
+  --color-bead-B12: #1B5534;
+  --color-bead-C2:  #CDECED;  --color-bead-C3:  #8DD4DD;  --color-bead-C5:  #3E8BCB;
+  --color-bead-C6:  #A8D4F0;  --color-bead-C7:  #2A4FA8;  --color-bead-C8:  #13366E;
+  --color-bead-C10: #1A6D9E;  --color-bead-C11: #4AB5B0;  --color-bead-C13: #E0F3F5;
+  --color-bead-D3:  #1E2858;  --color-bead-D6:  #C6B8E2;  --color-bead-D7:  #8858B8;
+  --color-bead-D9:  #D6C1E8;  --color-bead-D13: #C24098;  --color-bead-D15: #4A3A8E;
+  --color-bead-D18: #BE7FC3;  --color-bead-D19: #E1B8DF;  --color-bead-D21: #6E48A6;
+  --color-bead-E2:  #FCDFE5;  --color-bead-E3:  #F3B3D4;  --color-bead-E4:  #F58BB3;
+  --color-bead-E7:  #EF4A8E;  --color-bead-E8:  #FBC8D2;
+  --color-bead-F5:  #E23A3A;  --color-bead-F8:  #9E1E2A;  --color-bead-F13: #F77878;
+  --color-bead-G1:  #FFF4DC;  --color-bead-G5:  #D8A74A;  --color-bead-G7:  #8A5A36;
+  --color-bead-G8:  #5A3824;  --color-bead-G9:  #E6C89A;  --color-bead-G13: #A86B3E;
+  --color-bead-H1:  #FFFFFF;  --color-bead-H2:  #E0DDE2;  --color-bead-H3:  #B0ABB3;
+  --color-bead-H4:  #7C757E;  --color-bead-H5:  #46404A;  --color-bead-H7:  #1A0F1C;
+
+  /* ---------- Type scale ---------- */
+  --text-display: 40px;
+  --text-h1: 32px;
+  --text-h2: 24px;
+  --text-h3: 20px;
+  --text-h4: 16px;
+  --text-body: 16px;
+  --text-small: 14px;
+  --text-tiny: 12px;
+  --text-pixel-mono: 18px;
+
+  /* ---------- Radii ---------- */
+  --radius-pixel: 0px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* ---------- Shadows (hard sticker, zero blur) ---------- */
+  --shadow-sticker: 3px 3px 0 0 #572C5F;
+  --shadow-sticker-hover: 4px 4px 0 0 #572C5F;
+  --shadow-sticker-lg: 6px 6px 0 0 #572C5F;
+  --shadow-press: 1px 1px 0 0 #572C5F;
+  --shadow-inset-ink: inset 0 0 0 3px #572C5F;
+  --shadow-glow-pink: 0 0 0 6px rgba(247, 165, 184, 0.25);
+
+  /* ---------- Motion ---------- */
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 360ms;
+}
+
+@layer base {
+  body {
+    @apply antialiased bg-surface text-text-primary;
+  }
+}
+
+@layer utilities {
+  /* =====================================================================
+     v2 composite utilities — the sticker pattern needs 2-3 props together,
+     so we expose them as single classes. Use these instead of rebuilding.
+     ===================================================================== */
+
+  /* Sticker card: plum border + hard shadow, ready-to-use surface. */
+  .fsy-sticker {
+    border: 3px solid var(--color-ink);
+    box-shadow: var(--shadow-sticker);
+    transition: transform var(--duration-base) var(--ease-bounce),
+                box-shadow var(--duration-base) var(--ease-bounce);
+  }
+  .fsy-sticker:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: var(--shadow-sticker-hover);
+  }
+  .fsy-sticker:active {
+    transform: translate(2px, 2px);
+    box-shadow: var(--shadow-press);
+  }
+
+  /* Pill button in sticker style. Pair with bg-* utility. */
+  .fsy-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+    padding: 0 20px;
+    border-radius: var(--radius-pill);
+    border: 3px solid var(--color-ink);
+    box-shadow: var(--shadow-sticker);
+    color: var(--color-ink);
+    font-family: var(--font-cute);
+    font-weight: 600;
+    font-size: 16px;
+    cursor: pointer;
+    transition: transform var(--duration-base) var(--ease-bounce),
+                box-shadow var(--duration-base) var(--ease-bounce),
+                background-color var(--duration-fast) var(--ease-out);
+    user-select: none;
+  }
+  .fsy-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: var(--shadow-sticker-hover);
+  }
+  .fsy-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: var(--shadow-press);
+  }
+  .fsy-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: var(--shadow-sticker);
+  }
+  .fsy-btn-sm { height: 32px; padding: 0 14px; font-size: 14px; }
+  .fsy-btn-lg { height: 52px; padding: 0 28px; font-size: 18px; }
+
+  /* Card surface */
+  .fsy-card {
+    background: var(--color-paper-warm);
+    border: 3px solid var(--color-ink);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow-sticker);
+  }
+
+  /* Input */
+  .fsy-input {
+    width: 100%;
+    height: 44px;
+    padding: 0 14px;
+    background: var(--color-paper);
+    border: 3px solid var(--color-ink);
+    border-radius: var(--radius-md);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    box-shadow: var(--shadow-sticker);
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+  .fsy-input::placeholder { color: var(--color-ink-hint); }
+  .fsy-input:focus {
+    outline: none;
+    background: var(--color-butter);
+  }
+
+  /* SKU / tag pill (VT323) */
+  .fsy-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 8px 3px;
+    background: var(--color-butter);
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-sm);
+    color: var(--color-ink);
+    font-family: var(--font-pixel-mono);
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  /* Bead cell — round plastic with inner highlight */
+  .fsy-bead {
+    border-radius: 50%;
+    box-shadow: inset 1.5px 1.5px 0 rgba(255, 255, 255, 0.55);
+  }
+
+  /* Empty pattern cell — faint ink X to mimic peg grid */
+  .fsy-peg-empty {
+    background-image:
+      linear-gradient(45deg,  transparent 46%, rgba(87, 44, 95, 0.22) 46%, rgba(87, 44, 95, 0.22) 54%, transparent 54%),
+      linear-gradient(-45deg, transparent 46%, rgba(87, 44, 95, 0.22) 46%, rgba(87, 44, 95, 0.22) 54%, transparent 54%);
+    background-size: 60% 60%;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  /* =====================================================================
+     Existing utilities — preserved as-is from v1.
+     ===================================================================== */
+
+  .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #e4e4e7;
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
+
+  .pattern-checkered {
+    background-image: linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+      linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+      linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+  }
+}
+
+/* Global scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
+
+/* =====================================================================
+   Mobile perf tuning
+   ===================================================================== */
+
+/* Aurora blob blur — 90px is great on desktop but lags on mobile GPUs.
+   Drop to 50px under 640px viewport for a smoother frame rate. */
+@media (max-width: 640px) {
+  :root { --aurora-blur: 50px; }
+}
+
+/* Honor the user's OS motion preference — disable continuous idle
+   animations (floats, aurora drift) when reduced-motion is on. Keeps
+   functional UI transitions, kills the decorative loops. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Prevent iOS Safari from pumping up system font sizes in landscape. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }

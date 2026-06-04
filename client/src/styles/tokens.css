@@ -1,0 +1,173 @@
+/* =====================================================================
+   Fusiey Design Tokens — CSS Custom Properties
+   Drop-in reference. For Tailwind 4 utilities see @theme in index.css.
+   Two layers: (1) brand tokens  (2) MARD-221 bead palette.
+   ===================================================================== */
+
+:root {
+  /* ---------- Ink (outlines, text) ---------- */
+  --fsy-ink:            #572C5F;
+  --fsy-ink-deep:       #522756;
+  --fsy-ink-soft:       #653366;
+  --fsy-ink-hint:       #8F6A93;
+
+  /* ---------- Surfaces ---------- */
+  --fsy-blush:          #FCDFE5;
+  --fsy-blush-soft:     #FDE1EC;
+  --fsy-blush-deep:     #FAB3BB;
+  --fsy-paper:          #FFFFFF;
+  --fsy-paper-warm:     #FDF7F6;
+  --fsy-cream:          #FFF9F0;
+
+  /* ---------- Candy pastels (brand signature) ---------- */
+  --fsy-cotton:         #F7A5B8;
+  --fsy-cotton-hi:      #FEB0BF;
+  --fsy-peach:          #FDC6A9;
+  --fsy-butter:         #FFF4C0;
+  --fsy-mint:           #B8DFCA;
+  --fsy-sky:            #AFDCEB;
+  --fsy-lilac:          #E1B8DF;
+
+  /* ---------- Semantic aliases ---------- */
+  --fg-1:               var(--fsy-ink);
+  --fg-2:               var(--fsy-ink-soft);
+  --fg-3:               var(--fsy-ink-hint);
+  --fg-on-ink:          var(--fsy-blush);
+
+  --bg-1:               var(--fsy-blush);
+  --bg-2:               var(--fsy-paper-warm);
+  --bg-3:               var(--fsy-paper);
+
+  --accent:             var(--fsy-cotton);
+  --accent-hover:       #EF95AA;
+  --accent-on:          var(--fsy-ink);
+
+  --success:            var(--fsy-mint);
+  --warning:            var(--fsy-peach);
+  --info:               var(--fsy-sky);
+  --highlight:          var(--fsy-butter);
+
+  --border-ink:         var(--fsy-ink);
+  --border-soft:        #D8B9DB;
+
+  /* ---------- Radii ---------- */
+  --r-pixel:  0px;
+  --r-sm:     6px;
+  --r-md:     10px;
+  --r-lg:     16px;
+  --r-xl:     24px;
+  --r-pill:   999px;
+
+  /* ---------- Borders ---------- */
+  --bw-1: 2px;
+  --bw-2: 3px;   /* canonical */
+  --bw-3: 4px;
+  --bw-4: 6px;
+
+  /* ---------- Shadows (hard sticker, no blur) ---------- */
+  --shadow-sticker:       3px 3px 0 0 var(--fsy-ink);
+  --shadow-sticker-lg:    6px 6px 0 0 var(--fsy-ink);
+  --shadow-sticker-hover: 4px 4px 0 0 var(--fsy-ink);
+  --shadow-press:         1px 1px 0 0 var(--fsy-ink);
+  --shadow-inset-ink:     inset 0 0 0 3px var(--fsy-ink);
+  --shadow-glow-pink:     0 0 0 6px rgba(247,165,184,0.25);
+
+  /* ---------- Spacing (8pt + 4pt half-step) ---------- */
+  --s-0: 0px;  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px; --s-9: 96px;
+
+  /* ---------- Typography families ---------- */
+  --font-display: 'Press Start 2P', ui-monospace, monospace;
+  --font-pixel:   'Pixelify Sans', 'Press Start 2P', monospace;
+  --font-body:    'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-cute:    'Fredoka', 'Nunito', sans-serif;
+  --font-pixel-mono: 'VT323', ui-monospace, monospace;
+
+  /* ---------- Type scale ---------- */
+  --fs-display: 40px;
+  --fs-h1: 32px; --fs-h2: 24px; --fs-h3: 20px; --fs-h4: 16px;
+  --fs-body: 16px; --fs-small: 14px; --fs-tiny: 12px;
+  --fs-mono: 18px;
+
+  --lh-tight: 1.15; --lh-snug: 1.3; --lh-normal: 1.5; --lh-loose: 1.7;
+  --ls-display: 0.02em; --ls-body: 0; --ls-caps: 0.08em;
+
+  /* ---------- Motion ---------- */
+  --ease-bounce: cubic-bezier(.34, 1.56, .64, 1);
+  --ease-out:    cubic-bezier(.22, 1, .36, 1);
+  --dur-fast:    120ms;
+  --dur-base:    200ms;
+  --dur-slow:    360ms;
+
+  /* =====================================================================
+     MARD-221 Bead Palette — physical bead color codes
+     NOTE: hex values here may differ from client/src/constants/palettes.ts.
+     palettes.ts is the source of truth for pattern generation and physical
+     orders. These --bead-* vars are for UI preview styling only until the
+     two are synced.
+     ===================================================================== */
+
+  /* A — Yellow / Orange */
+  --bead-A4:  #FFDC3A;  /* yellow         24+48 */
+  --bead-A6:  #FF9A3A;  /* orange         24+48 */
+  --bead-A7:  #E46A1A;  /* dark orange    24+48 */
+  --bead-A10: #FFB34A;  /* tangerine      48    */
+  --bead-A11: #FFD89A;  /* peach yellow   48    */
+  --bead-A13: #F7B88A;  /* apricot        48    */
+
+  /* B — Green */
+  --bead-B3:  #B8E38E;  /* light green    24+48 */
+  --bead-B5:  #5FB86A;  /* green          24+48 */
+  --bead-B8:  #2E7A44;  /* dark green     24+48 */
+  --bead-B12: #1B5534;  /* forest green   48    */
+
+  /* C — Cyan / Blue */
+  --bead-C2:  #CDECED;  /* pale cyan      48    */
+  --bead-C3:  #8DD4DD;  /* cyan           24+48 */
+  --bead-C5:  #3E8BCB;  /* blue           24+48 */
+  --bead-C6:  #A8D4F0;  /* sky            48    */
+  --bead-C7:  #2A4FA8;  /* royal          48    */
+  --bead-C8:  #13366E;  /* dark blue      24+48 */
+  --bead-C10: #1A6D9E;  /* ocean          48    */
+  --bead-C11: #4AB5B0;  /* turquoise      48    */
+  --bead-C13: #E0F3F5;  /* ice            48    */
+
+  /* D — Purple */
+  --bead-D3:  #1E2858;  /* navy           48    */
+  --bead-D6:  #C6B8E2;  /* lavender       24+48 */
+  --bead-D7:  #8858B8;  /* purple         24+48 */
+  --bead-D9:  #D6C1E8;  /* light violet   24+48 */
+  --bead-D13: #C24098;  /* magenta        48    */
+  --bead-D15: #4A3A8E;  /* indigo         48    */
+  --bead-D18: #BE7FC3;  /* orchid         48    */
+  --bead-D19: #E1B8DF;  /* lilac          48    */
+  --bead-D21: #6E48A6;  /* violet         48    */
+
+  /* E — Pink */
+  --bead-E2:  #FCDFE5;  /* light pink     24+48 */
+  --bead-E3:  #F3B3D4;  /* orchid pink    48    */
+  --bead-E4:  #F58BB3;  /* pink           24+48 */
+  --bead-E7:  #EF4A8E;  /* hot pink       48    */
+  --bead-E8:  #FBC8D2;  /* soft pink      48    */
+
+  /* F — Red */
+  --bead-F5:  #E23A3A;  /* red            24+48 */
+  --bead-F8:  #9E1E2A;  /* dark red       48    */
+  --bead-F13: #F77878;  /* coral          48    */
+
+  /* G — Cream / Brown */
+  --bead-G1:  #FFF4DC;  /* cream          24+48 */
+  --bead-G5:  #D8A74A;  /* gold           24+48 */
+  --bead-G7:  #8A5A36;  /* brown          24+48 */
+  --bead-G8:  #5A3824;  /* dark brown     48    */
+  --bead-G9:  #E6C89A;  /* sand           48    */
+  --bead-G13: #A86B3E;  /* chestnut       48    */
+
+  /* H — Grayscale (6 steps) */
+  --bead-H1:  #FFFFFF;  /* white          24+48 */
+  --bead-H2:  #E0DDE2;  /* light grey     24+48 */
+  --bead-H3:  #B0ABB3;  /* grey           24+48 */
+  --bead-H4:  #7C757E;  /* medium grey    24+48 */
+  --bead-H5:  #46404A;  /* dark grey      24+48 */
+  --bead-H7:  #1A0F1C;  /* black          24+48 */
+}

@@ -1,0 +1,241 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// User & Auth
+// ============================================
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String
+  passwordHash    String?  // null = OAuth-only account (Google)
+  googleId        String?  @unique
+  emailVerified   Boolean  @default(false)
+  role            Role     @default(CUSTOMER)
+  // Credits: every new user gets 3 free generates. Decrements per AI call,
+  // increments on publish / community points trade.
+  generateCredits Int      @default(3)
+  communityPoints Int      @default(0)
+  // Used for auto-naming manual-drawn patterns ("drew bead 1", 2, 3, ...)
+  namingCounter   Int      @default(0)
+  avatarUrl       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  orders         Order[]
+  savedPatterns  SavedPattern[]
+  addresses      Address[]
+  communityLikes CommunityLike[]
+  generateLogs   GenerateLog[]
+
+  @@map("users")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  SUPERADMIN
+}
+
+// ============================================
+// Address (UK format)
+// ============================================
+
+model Address {
+  id       String  @id @default(cuid())
+  userId   String
+  label    String  @default("Home")
+  line1    String
+  line2    String?
+  city     String
+  county   String?
+  postcode String
+  country  String  @default("GB")
+  isDefault Boolean @default(false)
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("addresses")
+}
+
+// ============================================
+// Products
+// ============================================
+
+model Product {
+  id                 String   @id @default(cuid())
+  sku                String?  @unique
+  name               String
+  description        String
+  price              Decimal  @db.Decimal(10, 2)
+  currency           String   @default("GBP")
+  images             String[]
+  category           String
+  stock              Int      @default(0)
+  lowStockThreshold  Int      @default(5)
+  isCustomisable     Boolean  @default(false)
+  tags               String[]
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  orderItems OrderItem[]
+
+  @@map("products")
+}
+
+// ============================================
+// Orders
+// ============================================
+
+model Order {
+  id              String      @id @default(cuid())
+  userId          String
+  status          OrderStatus @default(PENDING)
+  totalAmount     Decimal     @db.Decimal(10, 2)
+  currency        String      @default("GBP")
+  shippingAddressId String?
+  paymentMethod   String?
+  paymentId       String?
+  trackingNumber  String?
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user            User        @relation(fields: [userId], references: [id])
+  shippingAddress Address?    @relation(fields: [shippingAddressId], references: [id])
+  items           OrderItem[]
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+model OrderItem {
+  id            String  @id @default(cuid())
+  orderId       String
+  productId     String
+  patternId     String?
+  quantity      Int
+  unitPrice     Decimal @db.Decimal(10, 2)
+  customisation Json?
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+// ============================================
+// Saved Patterns (user designs)
+// ============================================
+
+model SavedPattern {
+  id            String        @id @default(cuid())
+  userId        String
+  name          String
+  width         Int
+  height        Int
+  grid          Json
+  paletteId     String
+  beadSize      Float         @default(5)
+  thumbnail     String?
+  source        PatternSource @default(AI)
+  aiImageData   String?       // base64 of AI-stylised source (null for manual)
+  stats         Json?         // { uniqueColors, greyRatio, islands, greyCount, ... }
+  isPublished   Boolean       @default(false)
+  publishedAt   DateTime?
+  downloadCount Int           @default(0)
+  likeCount     Int           @default(0)
+  version       Int           @default(1)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes CommunityLike[]
+
+  @@index([isPublished, publishedAt(sort: Desc)])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("saved_patterns")
+}
+
+enum PatternSource {
+  AI
+  MANUAL
+}
+
+// ============================================
+// Community
+// ============================================
+
+model CommunityLike {
+  id        String   @id @default(cuid())
+  userId    String
+  patternId String
+  createdAt DateTime @default(now())
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pattern SavedPattern @relation(fields: [patternId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, patternId])
+  @@map("community_likes")
+}
+
+// ============================================
+// Generate log — audit trail for AI calls + credit mutations
+// ============================================
+
+model GenerateLog {
+  id         String       @id @default(cuid())
+  userId     String
+  kind       GenerateKind
+  creditCost Int          // -1 AI, -10 points trade, +1 publish reward, etc.
+  success    Boolean      @default(true)
+  errorMsg   String?
+  durationMs Int?
+  createdAt  DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([createdAt])
+  @@map("generate_logs")
+}
+
+enum GenerateKind {
+  AI_STYLIZE
+  AI_ANALYZE
+  AI_EVALUATE
+  AI_GENERATE_IMAGE
+  POINTS_TRADE
+  PUBLISH_REWARD
+  ADMIN_ADJUST
+}
+
+// ============================================
+// Site Config (admin-managed)
+// ============================================
+
+model SiteConfig {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+
+  @@map("site_config")
+}

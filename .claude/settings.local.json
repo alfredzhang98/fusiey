@@ -1,0 +1,83 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(where.exe node:*)",
+      "Bash(where.exe npm:*)",
+      "Bash(cmd.exe /c \"where npm\")",
+      "Bash(cmd.exe /c \"npm run build\")",
+      "Bash(cmd.exe /c \"npx vite build 2>&1\")",
+      "Bash(cmd.exe /c \"node -v && npm -v && cd /d C:\\\\Users\\\\alfred\\\\Desktop\\\\Fusiey && npm run lint 2>&1\")",
+      "Bash(powershell.exe -Command \"node -v; npm -v\")",
+      "Bash(mkdir -p client/src/pages client/src/components client/src/services client/src/store client/src/styles client/src/lib client/src/router client/src/constants client/src/types client/public)",
+      "Bash(mkdir -p server/src/routes server/src/controllers server/src/models server/src/middleware server/src/services server/src/config)",
+      "Bash(mkdir -p shared/types)",
+      "WebFetch(domain:www.reactbits.dev)",
+      "WebFetch(domain:github.com)",
+      "Bash(rm -rf src)",
+      "Bash(rm -rf public)",
+      "Bash(rm -rf server/index.ts)",
+      "Bash(rm index.html)",
+      "Bash(rm vite.config.ts)",
+      "Bash(npm install:*)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/nodejs:/c/Users/alfred/AppData/Roaming/npm\")",
+      "Bash(powershell.exe -Command \"\\(Get-Command npm\\).Source\")",
+      "Bash(powershell.exe -Command \"[System.Environment]::GetEnvironmentVariable\\('PATH', 'Machine'\\)\")",
+      "Bash(export PATH=\"$PATH:/d/Software/Nodejs\")",
+      "Bash(npm -v)",
+      "Bash(powershell.exe -Command 'Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }')",
+      "Bash(npx tsx:*)",
+      "Bash(powershell.exe -Command 'Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -ne 0 } | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }')",
+      "Bash(npx kill-port:*)",
+      "Bash(powershell.exe -Command \"Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(npx vite:*)",
+      "Bash(curl -s \"https://generativelanguage.googleapis.com/v1beta/models?key=AIzaSyAd_oKO0Ng56PIbtZ2UR3jwS7bW0tCjqmA\")",
+      "Bash(timeout 60 npx tsc --noEmit -p client/tsconfig.json)",
+      "Bash(npm ls *)",
+      "Bash(npm uninstall *)",
+      "Bash(timeout 60 npx tsc --noEmit -p server/tsconfig.build.json)",
+      "Bash(tasklist //FI \"IMAGENAME eq node.exe\")",
+      "Bash(tasklist //FI \"IMAGENAME eq node.exe\" //V)",
+      "Bash(wmic process *)",
+      "Bash(powershell -Command 'Get-CimInstance Win32_Process -Filter \"name='\\\\''node.exe'\\\\''\" | Where-Object { $_.CommandLine -match '\\\\''tsx|vite|concurrently|dev:client|dev:server'\\\\'' } | Select ProcessId,CommandLine | Format-List')",
+      "Bash(taskkill //F //PID 4204 //PID 13704 //PID 46336 //PID 48844 //PID 54260 //PID 37084 //PID 65704 //PID 66344)",
+      "Bash(npx tsc *)",
+      "Bash(taskkill //F //PID 2853 //T)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(chmod +x /c/Users/alfred/Desktop/Fusiey/.claude/hooks/restart-backend.sh)",
+      "Read(//tmp/**)",
+      "Bash(/c/Users/alfred/Desktop/Fusiey/.claude/hooks/restart-backend.sh echo *)",
+      "Bash(bash -x /c/Users/alfred/Desktop/Fusiey/.claude/hooks/restart-backend.sh)",
+      "Bash(jq --version)",
+      "Bash(node -e ' *)",
+      "Bash(powershell.exe -Command \"Get-NetTCPConnection -LocalPort 3000,5173 -ErrorAction SilentlyContinue | Select-Object LocalPort,State,OwningProcess | Format-Table -AutoSize\")",
+      "Bash(curl -s -o /dev/null -w \"backend  3000: HTTP %{http_code}\\\\n\" http://localhost:3000/api/health)",
+      "Bash(curl -s -o /dev/null -w \"frontend 5173: HTTP %{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(powershell.exe -Command \"Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue | Select LocalPort,State,OwningProcess\")",
+      "Bash(disown)",
+      "Bash(curl -s -o /dev/null -w \"backend  3000: HTTP %{http_code}\\\\nfrontend 5173: HTTP %{http_code}\\\\n\" http://localhost:3000 http://localhost:5173)",
+      "Bash(powershell.exe -Command \"Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select LocalPort,State,OwningProcess\")",
+      "Bash(netstat -ano)",
+      "Bash(tasklist /FI \"PID eq 47460\")",
+      "PowerShell(Stop-Process -Id 47460 -Force -ErrorAction Stop)",
+      "PowerShell(Stop-Process -Id 44336 -Force -ErrorAction SilentlyContinue)",
+      "Bash(npx prisma *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/restart-backend.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
