@@ -15,16 +15,12 @@ import { cn } from '../lib/utils';
 
 interface MobileToolRailProps {
   onOpenPalette: () => void;
+  /** Opens the page-level styled confirm instead of window.confirm. */
+  onRequestClear: () => void;
 }
 
-export function MobileToolRail({ onOpenPalette }: MobileToolRailProps) {
-  const { activeTool, setTool, clearGrid, selectedColor } = usePatternStore();
-
-  const handleClear = () => {
-    if (window.confirm('Clear the whole pattern? This cannot be undone.')) {
-      clearGrid();
-    }
-  };
+export function MobileToolRail({ onOpenPalette, onRequestClear }: MobileToolRailProps) {
+  const { activeTool, setTool, selectedColor } = usePatternStore();
 
   const tools: { name: Tool; icon: typeof Hand; label: string }[] = [
     { name: 'move',  icon: Hand,        label: 'Move' },
@@ -55,10 +51,8 @@ export function MobileToolRail({ onOpenPalette }: MobileToolRailProps) {
             aria-label={label}
             aria-pressed={active}
           >
-            <Icon className="w-5 h-5 text-ink" />
-            {/* Show the currently-selected paint colour as a small dot on the
-                paint button when it's active — gives immediate visual
-                confirmation of "what will get applied next." */}
+            <Icon className={cn('w-5 h-5 text-ink', name === 'fill' && '-scale-x-100')} />
+            {/* Active paint colour shown as a small dot on the paint button. */}
             {showColorDot && (
               <span
                 className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border border-ink"
@@ -72,7 +66,7 @@ export function MobileToolRail({ onOpenPalette }: MobileToolRailProps) {
 
       {/* Clear-all, destructive — cotton warning tint to differentiate. */}
       <button
-        onClick={handleClear}
+        onClick={onRequestClear}
         className="h-11 w-11 rounded-full border-[2px] border-ink bg-paper hover:bg-cotton/40 flex items-center justify-center transition-colors"
         style={{ boxShadow: '2px 2px 0 0 var(--color-ink)' }}
         aria-label="Clear pattern"

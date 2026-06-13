@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Menu, X, Home, Palette, Package, BookMarked, Sparkles, type LucideIcon } from 'lucide-react';
+import { Menu, X, Home, Palette, Package, BookMarked, UserRound, ShoppingCart, type LucideIcon } from 'lucide-react';
 import { cn } from './lib/utils';
 import { useAuthStore } from './store/useAuthStore';
+import { useCartStore } from './store/useCartStore';
+import { useCurrencyStore } from './store/useCurrencyStore';
 
 const NAV_ITEMS: { path: string; label: string; icon: LucideIcon }[] = [
   { path: '/', label: 'Home', icon: Home },
@@ -14,17 +16,21 @@ const NAV_ITEMS: { path: string; label: string; icon: LucideIcon }[] = [
 // Shown only when logged in — inserted after the public nav items.
 const AUTH_NAV_ITEMS: { path: string; label: string; icon: LucideIcon }[] = [
   { path: '/my-works', label: 'My Works', icon: BookMarked },
+  { path: '/profile', label: 'Profile', icon: UserRound },
 ];
 
 export default function App() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, fetchMe, logout } = useAuthStore();
+  const cartCount = useCartStore((s) => s.itemCount());
+  const initFromGeo = useCurrencyStore((s) => s.initFromGeo);
 
-  // Rehydrate user from cookie on first mount.
+  // Rehydrate user from cookie + detect region currency on first mount.
   useEffect(() => {
     fetchMe();
-  }, [fetchMe]);
+    initFromGeo();
+  }, [fetchMe, initFromGeo]);
 
   const navItems = user ? [...NAV_ITEMS, ...AUTH_NAV_ITEMS] : NAV_ITEMS;
 
@@ -78,19 +84,33 @@ export default function App() {
 
           {/* Right: auth on desktop, hamburger on mobile */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Cart — only when signed in */}
+            {user && (
+              <Link
+                to="/checkout"
+                aria-label="Cart"
+                className="relative inline-flex items-center justify-center h-9 w-9 rounded-pill border-[2px] border-ink bg-paper text-ink hover:bg-butter transition-colors"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-cotton border-[1.5px] border-ink rounded-full text-[10px] font-pixel-mono flex items-center justify-center">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
+            )}
             {user ? (
               <>
-                {/* Credits badge — little sparkle chip */}
-                <div
-                  className="hidden md:inline-flex items-center gap-1 h-8 px-3 bg-butter border-[2px] border-ink rounded-pill font-pixel-mono text-xs text-ink"
-                  title={`${user.generateCredits} AI generations · ${user.communityPoints} community points`}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  {user.generateCredits}
-                </div>
                 <span className="hidden md:inline font-cute font-semibold text-sm text-ink max-w-[140px] truncate">
                   {user.name}
                 </span>
+                <Link
+                  to="/profile"
+                  className="hidden md:inline-flex items-center font-cute font-semibold text-sm text-ink-hint hover:text-ink px-1 py-2"
+                  title="Profile"
+                >
+                  <UserRound className="w-4 h-4" />
+                </Link>
                 <button
                   onClick={() => logout()}
                   className="hidden md:inline-flex items-center font-cute font-semibold text-sm text-ink-hint hover:text-ink hover:underline decoration-[2px] underline-offset-4 px-2 py-2"
@@ -100,12 +120,14 @@ export default function App() {
               </>
             ) : (
               <>
+                {/* Single Sign In button — visible on all sizes */}
                 <Link
                   to="/login"
-                  className="hidden md:inline-flex items-center font-cute font-semibold text-sm text-ink hover:underline decoration-[2px] underline-offset-4 px-3 py-2 whitespace-nowrap"
+                  className="fsy-btn fsy-btn-sm bg-paper hover:bg-butter whitespace-nowrap"
                 >
                   Sign In
                 </Link>
+                {/* Get Started — desktop only (mobile uses the menu) */}
                 <Link
                   to="/register"
                   className="fsy-btn fsy-btn-sm bg-cotton hover:bg-accent-hover whitespace-nowrap hidden md:inline-flex"
@@ -160,18 +182,40 @@ export default function App() {
                   );
                 })}
                 <div className="pt-3 mt-2 border-t-[2px] border-ink/20 flex flex-col gap-2">
-                  <Link
-                    to="/login"
-                    className="fsy-btn bg-paper w-full justify-center"
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="fsy-btn bg-cotton w-full justify-center"
-                  >
-                    Get Started
-                  </Link>
+                  {user ? (
+                    <>
+                      <div className="flex items-center gap-3 px-1 py-1">
+                        <div className="w-9 h-9 rounded-full bg-butter border-[2px] border-ink flex items-center justify-center shrink-0">
+                          <UserRound className="w-5 h-5 text-ink" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-cute font-semibold text-ink text-sm truncate">{user.name}</p>
+                          <p className="font-body text-ink-hint text-[11px] truncate">{user.email}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => logout()}
+                        className="fsy-btn bg-paper w-full justify-center"
+                      >
+                        Sign Out
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        to="/login"
+                        className="fsy-btn bg-paper w-full justify-center"
+                      >
+                        Sign In
+                      </Link>
+                      <Link
+                        to="/register"
+                        className="fsy-btn bg-cotton w-full justify-center"
+                      >
+                        Get Started
+                      </Link>
+                    </>
+                  )}
                 </div>
               </div>
             </motion.div>

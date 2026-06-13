@@ -7,14 +7,26 @@
  * Stash the instance on globalThis so reloads reuse it.
  */
 
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+
+import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
 import { PrismaClient } from '../../../generated/prisma/client.js';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-// Prisma 7's constructor signature wants accelerateUrl even for local DB;
-// cast to any to avoid that when we're using DATABASE_URL from .env.
-export const prisma =
-  globalForPrisma.prisma ?? (new (PrismaClient as any)());
+function createPrismaClient() {
+  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  const adapter = new PrismaPg(pool);
+  return new PrismaClient({ adapter });
+}
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;

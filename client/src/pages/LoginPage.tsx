@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
+import { GOOGLE_ENABLED } from '../config/google';
 import { useAuthStore } from '../store/useAuthStore';
 
 export function LoginPage() {
@@ -13,7 +14,7 @@ export function LoginPage() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const nextPath = new URLSearchParams(location.search).get('next') || '/designer';
+  const nextPath = new URLSearchParams(location.search).get('next') || '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +63,11 @@ export function LoginPage() {
               className="h-10 px-3 bg-paper-warm border-[2px] border-ink/25 focus:border-ink rounded-[10px] font-body text-sm outline-none transition-colors"
             />
           </label>
+          <div className="text-right -mt-1">
+            <Link to="/forgot-password" className="font-body text-[11px] text-ink-hint hover:text-ink underline">
+              Forgot password?
+            </Link>
+          </div>
           {localError && (
             <p className="font-body text-[12px] text-red-600">{localError}</p>
           )}
@@ -75,31 +81,35 @@ export function LoginPage() {
           </button>
         </form>
 
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-[1px] bg-ink/20" />
-          <span className="font-body text-[11px] text-ink-hint uppercase tracking-wider">or</span>
-          <div className="flex-1 h-[1px] bg-ink/20" />
-        </div>
+        {GOOGLE_ENABLED && (
+          <>
+            <div className="flex items-center gap-3 my-5">
+              <div className="flex-1 h-[1px] bg-ink/20" />
+              <span className="font-body text-[11px] text-ink-hint uppercase tracking-wider">or</span>
+              <div className="flex-1 h-[1px] bg-ink/20" />
+            </div>
 
-        <div className="flex justify-center">
-          <GoogleLogin
-            onSuccess={async (r) => {
-              if (!r.credential) return;
-              setBusy(true);
-              setLocalError(null);
-              try {
-                await loginWithGoogle(r.credential);
-                navigate(nextPath, { replace: true });
-              } catch (err: any) {
-                setLocalError(err.message || 'Google login failed');
-              } finally {
-                setBusy(false);
-              }
-            }}
-            onError={() => setLocalError('Google login failed')}
-            width="100%"
-          />
-        </div>
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={async (r) => {
+                  if (!r.credential) return;
+                  setBusy(true);
+                  setLocalError(null);
+                  try {
+                    await loginWithGoogle(r.credential);
+                    navigate(nextPath, { replace: true });
+                  } catch (err: any) {
+                    setLocalError(err.message || 'Google login failed');
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                onError={() => setLocalError('Google login failed')}
+                width="100%"
+              />
+            </div>
+          </>
+        )}
 
         <p className="font-body text-[12px] text-ink-hint text-center mt-6">
           No account?{' '}

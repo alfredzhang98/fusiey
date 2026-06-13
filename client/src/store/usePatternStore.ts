@@ -19,6 +19,8 @@ interface PatternState {
   activeTool: Tool;
 
   setPattern: (pattern: Pattern) => void;
+  newCanvas: (width: number, height: number) => void;
+  setName: (name: string) => void;
   updateCell: (x: number, y: number, colorId: string | null) => void;
   setSelectedColor: (color: Color | null) => void;
   setPalette: (paletteId: string) => void;
@@ -47,6 +49,33 @@ export const usePatternStore = create<PatternState>((set, get) => ({
       historyIndex: 0,
       activeTool: 'move',
     });
+  },
+
+  /**
+   * Blank canvas of the given board size. `local-` id prefix marks the
+   * pattern as not-yet-saved; the first "Save to My Works" swaps it for
+   * the server-assigned id.
+   */
+  newCanvas: (width, height) => {
+    const grid = Array.from({ length: height }, () =>
+      Array.from({ length: width }, () => ({ colorId: null })),
+    );
+    get().setPattern({
+      id: `local-${Date.now()}`,
+      name: '',
+      width,
+      height,
+      grid,
+      paletteId: get().currentPalette.id,
+      beadSize: 5,
+    });
+    set({ activeTool: 'paint' });
+  },
+
+  setName: (name) => {
+    const { pattern } = get();
+    if (!pattern) return;
+    set({ pattern: { ...pattern, name } });
   },
 
   updateCell: (x: number, y: number, colorId: string | null) => {
