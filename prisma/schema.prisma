@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider   = "prisma-client"
+  output     = "../generated/prisma"
+  engineType = "library"
 }
 
 datasource db {
@@ -29,13 +30,56 @@ model User {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  orders         Order[]
-  savedPatterns  SavedPattern[]
-  addresses      Address[]
-  communityLikes CommunityLike[]
-  generateLogs   GenerateLog[]
+  orders           Order[]
+  savedPatterns    SavedPattern[]
+  addresses        Address[]
+  communityLikes   CommunityLike[]
+  generateLogs     GenerateLog[]
+  passwordResets   PasswordReset[]
+  patternPurchases PatternPurchase[]
 
   @@map("users")
+}
+
+// ============================================
+// Password reset — 6-digit code, hashed, short-lived
+// ============================================
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  codeHash  String   // bcrypt hash of the 6-digit code (never stored in plain)
+  // Timestamptz so the 10-minute window compares as an absolute instant,
+  // immune to the DB session timezone (plain `timestamp` lost an hour in BST).
+  expiresAt DateTime @db.Timestamptz(3)
+  used      Boolean  @default(false)
+  attempts  Int      @default(0) // wrong-code guesses; locked after 5
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("password_resets")
+}
+
+// ============================================
+// Discount codes — homepage "10% off first kit" promo
+// ============================================
+
+model DiscountCode {
+  id         String    @id @default(cuid())
+  code       String    @unique
+  email      String    // lowercased email the code was issued to
+  percentOff Int       @default(10)
+  campaign   String    @default("WELCOME") // tag for reporting / future promos
+  used       Boolean   @default(false)
+  usedAt     DateTime? @db.Timestamptz(3)
+  orderId    String?   @unique // the order that redeemed it
+  expiresAt  DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([email])
+  @@map("discount_codes")
 }
 
 enum Role {
@@ -75,13 +119,25 @@ model Product {
   sku                String?  @unique
   name               String
   description        String
-  price              Decimal  @db.Decimal(10, 2)
-  currency           String   @default("GBP")
+  // Per-region retail price (VAT-inclusive). GBP is required (UK home market +
+  // the currency PayPal settles into). USD is optional — null means the product
+  // is NOT sold in the US region. Prices are set manually per region, never
+  // derived from an exchange rate.
+  priceGBP           Decimal  @db.Decimal(10, 2)
+  priceUSD           Decimal? @db.Decimal(10, 2)
   images             String[]
   category           String
   stock              Int      @default(0)
   lowStockThreshold  Int      @default(5)
   isCustomisable     Boolean  @default(false)
+  isDigital          Boolean  @default(false)
+  // Pattern (图纸) deliverables. Certified patterns carry an editable JSON that
+  // is copied into the buyer's My Works on purchase; non-certified patterns
+  // carry a downloadable file (PDF/PNG) the buyer downloads from My Works.
+  isCertifiedPattern Boolean  @default(false)
+  patternData        Json?    // certified: editable pattern { name,width,height,grid,paletteId,beadSize }
+  patternFileUrl     String?  // non-certified: /uploads/patterns/... download
+  patternFileType    String?  // 'pdf' | 'png'
   tags               String[]
   isActive           Boolean  @default(true)
   createdAt          DateTime @default(now())
@@ -100,12 +156,22 @@ model Order {
   id              String      @id @default(cuid())
   userId          String
   status          OrderStatus @default(PENDING)
+  // ── Accounting breakdown (all VAT-inclusive, GBP). totalAmount is the
+  //    grand total charged: subtotal − discount + shipping. ──
+  subtotalAmount  Decimal     @db.Decimal(10, 2) @default(0) // sum of line items
+  discountAmount  Decimal     @db.Decimal(10, 2) @default(0) // money taken off
+  discountCode    String?     // code applied at checkout, if any
+  shippingAmount  Decimal     @db.Decimal(10, 2) @default(0)
+  vatAmount       Decimal     @db.Decimal(10, 2) @default(0) // VAT portion of total
   totalAmount     Decimal     @db.Decimal(10, 2)
   currency        String      @default("GBP")
   shippingAddressId String?
   paymentMethod   String?
   paymentId       String?
   trackingNumber  String?
+  carrier         String?
+  trackingUrl     String?
+  cancelReason    String?
   notes           String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -157,6 +223,10 @@ model SavedPattern {
   beadSize      Float         @default(5)
   thumbnail     String?
   source        PatternSource @default(AI)
+  // Purchased certified ("official") patterns: an editable copy delivered into
+  // the buyer's My Works. sourceProductId dedupes one copy per product.
+  isPurchased     Boolean     @default(false)
+  sourceProductId String?
   aiImageData   String?       // base64 of AI-stylised source (null for manual)
   stats         Json?         // { uniqueColors, greyRatio, islands, greyCount, ... }
   isPublished   Boolean       @default(false)
@@ -170,6 +240,7 @@ model SavedPattern {
   user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   likes CommunityLike[]
 
+  @@unique([userId, sourceProductId])
   @@index([isPublished, publishedAt(sort: Desc)])
   @@index([userId, updatedAt(sort: Desc)])
   @@map("saved_patterns")
@@ -178,6 +249,7 @@ model SavedPattern {
 enum PatternSource {
   AI
   MANUAL
+  OFFICIAL
 }
 
 // ============================================
@@ -238,4 +310,65 @@ model SiteConfig {
   value Json
 
   @@map("site_config")
+}
+
+// ============================================
+// Media Library (admin-managed product images)
+// ============================================
+// Structured, non-flat storage: category → product folder (code + name) →
+// image assets. Files live on disk under UPLOAD_DIR; rows hold metadata + the
+// public relative URL.
+
+model MediaFolder {
+  id        String       @id @default(cuid())
+  category  String        // one of the 5 product category keys
+  code      String        // 商品编号
+  name      String        // 商品名称
+  createdAt DateTime     @default(now())
+
+  assets MediaAsset[]
+
+  @@unique([category, code])
+  @@map("media_folders")
+}
+
+model MediaAsset {
+  id        String   @id @default(cuid())
+  folderId  String
+  url       String   // relative "/uploads/products/<category>/<code>/<file>"
+  filename  String
+  mime      String
+  size      Int
+  width     Int?
+  height    Int?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  folder MediaFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@index([folderId])
+  @@map("media_assets")
+}
+
+// ============================================
+// Pattern purchases — non-certified (download) pattern deliverables
+// ============================================
+// Certified patterns deliver an editable SavedPattern copy; non-certified
+// pattern products deliver a downloadable file (PDF/PNG) recorded here and
+// shown in the buyer's My Works.
+
+model PatternPurchase {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  name      String
+  fileUrl   String   // /uploads/patterns/...
+  fileType  String   // 'pdf' | 'png'
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("pattern_purchases")
 }

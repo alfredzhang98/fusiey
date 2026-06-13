@@ -83,7 +83,7 @@ patternRoutes.post('/', async (req, res) => {
         paletteId: body.paletteId,
         beadSize: body.beadSize ?? 5,
         thumbnail: body.thumbnail,
-        source: body.source ?? 'AI',
+        source: body.source ?? 'MANUAL',
         aiImageData: body.aiImageData,
         stats: body.stats ?? undefined,
       },
@@ -93,28 +93,65 @@ patternRoutes.post('/', async (req, res) => {
   return res.status(201).json({ pattern: lightweight(pattern) });
 });
 
-// ── GET /patterns ─────────────────────────────────────────────────────
+// ── GET /patterns (paginated, no thumbnail payload) ────────────────────
 patternRoutes.get('/', async (req, res) => {
-  const patterns = await prisma.savedPattern.findMany({
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 12));
+  const where: any = { userId: req.user!.id };
+  // ?purchased=true → bought (certified/official) copies; false → own designs.
+  if (req.query.purchased === 'true') where.isPurchased = true;
+  else if (req.query.purchased === 'false') where.isPurchased = false;
+
+  // Note: `thumbnail` is intentionally excluded — it's fetched lazily and
+  // cached via the dedicated /thumbnail image endpoint, keeping this JSON small.
+  const [patterns, total] = await Promise.all([
+    prisma.savedPattern.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+      select: {
+        id: true, name: true, width: true, height: true, paletteId: true,
+        source: true, isPurchased: true, isPublished: true, publishedAt: true,
+        downloadCount: true, likeCount: true, createdAt: true, updatedAt: true,
+      },
+    }),
+    prisma.savedPattern.count({ where }),
+  ]);
+
+  return res.json({ patterns, total, page, totalPages: Math.ceil(total / limit) });
+});
+
+// ── GET /patterns/purchases — non-certified (download) pattern purchases ──
+// Defined before /:id so "purchases" isn't captured as an id.
+patternRoutes.get('/purchases', async (req, res) => {
+  const purchases = await prisma.patternPurchase.findMany({
     where: { userId: req.user!.id },
-    orderBy: { updatedAt: 'desc' },
-    select: {
-      id: true,
-      name: true,
-      width: true,
-      height: true,
-      paletteId: true,
-      thumbnail: true,
-      source: true,
-      isPublished: true,
-      publishedAt: true,
-      downloadCount: true,
-      likeCount: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    orderBy: { createdAt: 'desc' },
   });
-  return res.json({ patterns });
+  return res.json({ purchases });
+});
+
+// ── GET /patterns/:id/thumbnail — cached PNG, no base64 in list JSON ────
+patternRoutes.get('/:id/thumbnail', async (req, res) => {
+  const pattern = await prisma.savedPattern.findUnique({
+    where: { id: req.params.id },
+    select: { userId: true, thumbnail: true, updatedAt: true },
+  });
+  // Owner can always view; admins can view any (needed to fulfil custom orders).
+  const isAdmin = req.user!.role === 'ADMIN' || req.user!.role === 'SUPERADMIN';
+  if (!pattern || (!isAdmin && pattern.userId !== req.user!.id) || !pattern.thumbnail) {
+    return res.status(404).end();
+  }
+  const m = pattern.thumbnail.match(/^data:image\/png;base64,(.+)$/);
+  if (!m) return res.status(404).end();
+
+  // Strong-ish caching: ETag from updatedAt → browser revalidates with 304.
+  const etag = `"thumb-${pattern.updatedAt.getTime()}"`;
+  if (req.headers['if-none-match'] === etag) return res.status(304).end();
+  res.set('ETag', etag);
+  res.set('Cache-Control', 'private, max-age=86400');
+  res.type('png').send(Buffer.from(m[1], 'base64'));
 });
 
 // ── GET /patterns/:id ─────────────────────────────────────────────────

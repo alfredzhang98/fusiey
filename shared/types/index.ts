@@ -165,7 +165,7 @@ export const OrderItemSchema = z.object({
   patternId: z.string().optional(),
   quantity: z.number(),
   unitPrice: z.number(),
-  customisation: z.record(z.string()).optional(),
+  customisation: z.record(z.string(), z.string()).optional(),
 });
 
 export type OrderItem = z.infer<typeof OrderItemSchema>;
@@ -176,7 +176,7 @@ export const OrderSchema = z.object({
   items: z.array(OrderItemSchema),
   status: OrderStatusSchema,
   totalAmount: z.number(),
-  currency: z.literal('GBP'),
+  currency: z.enum(['GBP', 'USD']),
   shippingAddress: z.object({
     line1: z.string(),
     line2: z.string().optional(),
@@ -199,8 +199,8 @@ export const ProductSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
-  price: z.number(),
-  currency: z.literal('GBP'),
+  priceGBP: z.number(),
+  priceUSD: z.number().nullable(),
   images: z.array(z.string()),
   category: z.string(),
   stock: z.number(),

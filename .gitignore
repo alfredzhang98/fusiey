@@ -35,10 +35,13 @@ yarn-error.log*
 Thumbs.db
 
 # Prisma
+# Note: prisma/migrations/ IS committed so production can `prisma migrate deploy`.
 /generated/prisma
-prisma/migrations/
 
 # Temporary files
 .claude/
 tmp/
 temp/
+
+# Admin-uploaded files (product images, pattern downloads)
+/uploads/

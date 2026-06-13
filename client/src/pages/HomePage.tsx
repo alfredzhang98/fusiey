@@ -1,10 +1,11 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { AuroraBackground } from '../components/AuroraBackground';
 import confetti from 'canvas-confetti';
-import { Sparkles, Leaf, Diamond, ArrowRight, Palette, Truck, ShieldCheck, Package, Box, Instagram, Mail, MessageCircle } from 'lucide-react';
+import { Sparkles, Leaf, Diamond, ArrowRight, Palette, Truck, ShieldCheck, Package, Box, Mail, MessageCircle, Upload, Star } from 'lucide-react';
 import { FadeStickOn, FUSIEY_CONFETTI_COLORS } from '../components/interactive';
+import { promoApi, configApi, ApiError, type SiteConfig } from '../services/api';
 
 /** TikTok mark — simplified inline SVG (lucide has no TikTok icon). */
 function TikTokIcon({ className = '' }: { className?: string }) {
@@ -15,23 +16,8 @@ function TikTokIcon({ className = '' }: { className?: string }) {
   );
 }
 
-/** Rednote (小红书) mark — simplified inline SVG. */
-function RednoteIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
-      <path d="M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm3.2 6v6h1.4v-2.4h.8l1.3 2.4h1.5l-1.4-2.6c.7-.3 1.1-.9 1.1-1.7 0-1.1-.8-1.7-2-1.7H7.2zm1.4 1.1h1c.6 0 .9.2.9.7s-.3.7-.9.7h-1v-1.4zm5 4.9h3.8v-1.1h-2.4v-1.3h2.1v-1.1h-2.1v-1.3h2.4V9h-3.8v6z" />
-    </svg>
-  );
-}
-
-/** Social strip at the very top — follow us, before anything else. */
-function SocialStrip() {
-  // TODO: replace # with real handles
-  const links = [
-    { href: '#',  label: 'TikTok',    Icon: TikTokIcon },
-    { href: '#',  label: 'Instagram', Icon: Instagram },
-    { href: '#',  label: 'Rednote',   Icon: RednoteIcon },
-  ];
+/** Social strip at the very top — follow us on TikTok. */
+function SocialStrip({ tiktokUrl }: { tiktokUrl?: string }) {
   return (
     <div className="bg-butter/75 px-3 sm:px-4 py-3">
       <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-center gap-x-3 sm:gap-x-5 gap-y-2">
@@ -39,34 +25,30 @@ function SocialStrip() {
           <Sparkles className="w-4 h-4" />
           Follow along for daily pattern drops
         </span>
-        <div className="flex items-center gap-2">
-          {links.map(({ href, label, Icon }) => (
-            <a
-              key={label}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Fusiey on ${label}`}
-              className="fsy-tag hover:bg-cotton transition-colors duration-[120ms] cursor-pointer"
-            >
-              <Icon className="w-4 h-4" />
-              <span className="leading-none">{label}</span>
-            </a>
-          ))}
-        </div>
+        <a
+          href={tiktokUrl || '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Fusiey on TikTok"
+          className="fsy-tag hover:bg-cotton transition-colors duration-[120ms] cursor-pointer"
+        >
+          <TikTokIcon className="w-4 h-4" />
+          <span className="leading-none">TikTok</span>
+        </a>
       </div>
     </div>
   );
 }
 
-/** Newsletter signup — email + GDPR consent. Wire to real endpoint later. */
-function NewsletterForm() {
+/** Newsletter signup — email + GDPR consent. Emails a discount code. */
+function NewsletterForm({ percent = 10 }: { percent?: number }) {
   const [email, setEmail] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       setError('Please enter a valid email.');
@@ -77,8 +59,24 @@ function NewsletterForm() {
       return;
     }
     setError(null);
-    // TODO: wire to Airwallex/Resend/Mailchimp/Klaviyo etc.
-    console.log('[newsletter] subscribe', email);
+    setBusy(true);
+    try {
+      await promoApi.welcome(email);
+    } catch (err: any) {
+      // Rate-limit / network errors shouldn't block the celebration — the
+      // server is idempotent, so we surface a gentle message and still confirm.
+      if (err instanceof ApiError && err.status === 429) {
+        setError('You already claimed this recently — check your inbox.');
+        setBusy(false);
+        return;
+      }
+      if (err instanceof ApiError && err.status === 400) {
+        setError(err.message || 'Please enter a valid email.');
+        setBusy(false);
+        return;
+      }
+    }
+    setBusy(false);
     setSubmitted(true);
     // 🎉 Brand-colored celebration burst. Two shots from opposite corners.
     const shoot = (origin: { x: number; y: number }) =>
@@ -100,7 +98,7 @@ function NewsletterForm() {
       <div className="fsy-sticker inline-flex items-center gap-3 px-6 py-4 rounded-[16px] bg-butter max-w-lg mx-auto">
         <Sparkles className="w-5 h-5 text-ink" />
         <span className="font-cute font-semibold text-ink">
-          Welcome to the club! Check your inbox for your 10% code.
+          Welcome to the club! Check your inbox for your {percent}% code.
         </span>
       </div>
     );
@@ -117,9 +115,9 @@ function NewsletterForm() {
           className="fsy-input flex-1"
           aria-label="Email address"
         />
-        <button type="submit" className="fsy-btn fsy-btn-lg bg-butter hover:bg-paper gap-2 whitespace-nowrap">
+        <button type="submit" disabled={busy} className="fsy-btn fsy-btn-lg bg-butter hover:bg-paper gap-2 whitespace-nowrap disabled:opacity-60">
           <Sparkles className="w-5 h-5" />
-          Claim my 10%
+          {busy ? 'Sending…' : `Claim my ${percent}%`}
         </button>
       </div>
       <label className="inline-flex items-center gap-2 font-body text-sm text-ink cursor-pointer select-none">
@@ -227,6 +225,12 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 }
 
 export function HomePage() {
+  const [site, setSite] = useState<SiteConfig | null>(null);
+  useEffect(() => {
+    configApi.site().then(setSite).catch(() => {});
+  }, []);
+  const pct = site?.welcomeDiscountPercent ?? 10;
+
   return (
     <div className="overflow-hidden bg-blush relative">
       {/* Page-level ambient aurora — fixed to viewport, visible on every
@@ -244,8 +248,15 @@ export function HomePage() {
       {/* Content wrapper — preserves z-layering for Hero's stacked effects */}
       <div className="relative z-10">
 
+      {/* ===== ANNOUNCEMENT BANNER (admin-configurable) ===== */}
+      {site?.announcement?.enabled && site.announcement.text && (
+        <div className="bg-ink text-paper px-4 py-2 text-center font-cute font-semibold text-xs sm:text-sm">
+          {site.announcement.text}
+        </div>
+      )}
+
       {/* ===== SOCIAL STRIP ===== */}
-      <SocialStrip />
+      <SocialStrip tiktokUrl={site?.tiktokUrl} />
 
       {/* ===== HERO ===== */}
       <section className="relative min-h-[85vh] flex items-center justify-center px-5 sm:px-8 py-14 sm:py-20 overflow-hidden">
@@ -325,8 +336,7 @@ export function HomePage() {
             transition={{ duration: 0.7, delay: 0.4 }}
             className="font-body text-base sm:text-lg md:text-xl text-ink-soft max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed px-2"
           >
-            Create custom perler bead patterns with AI, or explore our curated starter kits with
-            official designs and complete tool sets. Premium quality, delivered across the UK.
+            Design your own perler bead patterns with our designer, or explore our curated starter kits with official designs and complete tool sets. Premium quality, shipped across the UK and USA.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -338,7 +348,7 @@ export function HomePage() {
           >
             <Link to="/designer" className="fsy-btn fsy-btn-lg bg-cotton hover:bg-accent-hover gap-2 group">
               <Palette className="w-5 h-5" />
-              AI Designer
+              Start Designing
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </Link>
             <Link to="/products" className="fsy-btn fsy-btn-lg bg-paper hover:bg-butter gap-2 group">
@@ -350,9 +360,52 @@ export function HomePage() {
         </div>
       </section>
 
+      {/* ===== COMMUNITY (coming-soon teaser) ===== */}
+      <section className="px-5 sm:px-8 py-12">
+        <div className="max-w-4xl mx-auto">
+          <div
+            className="relative bg-lilac/50 border-[3px] border-ink rounded-[24px] p-8 sm:p-10 text-center overflow-hidden"
+            style={{ boxShadow: '5px 5px 0 0 var(--color-ink)' }}
+          >
+            {/* floating beads decoration */}
+            <div className="pointer-events-none absolute -top-3 -right-3 flex gap-1.5 opacity-70" aria-hidden="true">
+              {['bg-cotton', 'bg-butter', 'bg-mint'].map((b) => (
+                <div key={b} className={`fsy-bead w-7 h-7 border-[2px] border-ink ${b}`} />
+              ))}
+            </div>
+
+            <span className="inline-flex items-center gap-1.5 fsy-tag bg-cotton mb-4">
+              <Sparkles className="w-3.5 h-3.5" /> Coming soon
+            </span>
+            <h2 className="font-cute font-bold text-ink text-2xl sm:text-3xl mb-3">
+              Fusiey Community
+            </h2>
+            <p className="font-body text-ink-soft text-sm sm:text-base max-w-xl mx-auto mb-6">
+              Share, discover and remix bead patterns. Soon you'll be able to open both
+              community designs and official Fusiey patterns straight in the designer — drop
+              one onto your canvas and make it your own.
+            </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              {[
+                { icon: Upload, label: 'Import community patterns' },
+                { icon: Palette, label: 'Remix official patterns' },
+                { icon: Star, label: 'Earn & spend points' },
+              ].map(({ icon: Icon, label }) => (
+                <div
+                  key={label}
+                  className="inline-flex items-center gap-2 bg-paper border-[2px] border-ink rounded-pill px-4 py-2 font-cute font-semibold text-ink text-sm"
+                >
+                  <Icon className="w-4 h-4" /> {label}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ===== WHY FUSIEY (what's in every kit + brand values) =====
           Scope: everything the customer *gets* or the brand *stands for*.
-          The "how to start" paths (AI vs Official Patterns) belong to Step 1
+          The "how to start" paths (Designer vs Official Patterns) belong to Step 1
           in HOW IT WORKS below, not here. */}
       <RainbowDivider />
       <section className="px-5 sm:px-8 py-16 sm:py-24 bg-cream/70">
@@ -422,7 +475,7 @@ export function HomePage() {
                 icon: Palette,
                 bg: 'bg-cotton',
                 title: 'Design or Choose',
-                desc: 'Create a custom pattern with our AI designer, or pick from our curated collection of official Fusiey templates.',
+                desc: 'Create a custom pattern with our designer, or pick from our curated collection of official Fusiey templates.',
                 tags: ['Free to try'],
               },
               {
@@ -509,13 +562,13 @@ export function HomePage() {
                 </span>
               </div>
               <h2 className="font-cute font-bold text-ink text-3xl md:text-4xl mb-4">
-                Get 10% off your first kit
+                Get {pct}% off your first kit
               </h2>
               <p className="font-body text-ink-soft text-lg mb-8 max-w-xl mx-auto">
                 New patterns, seasonal drops, and the occasional bead meme — straight to your inbox.
                 No spam, unsubscribe any time.
               </p>
-              <NewsletterForm />
+              <NewsletterForm percent={pct} />
             </div>
           </div>
         </FadeInUp>
@@ -532,7 +585,7 @@ export function HomePage() {
                 <img src="/logo-text.svg" alt="Fusiey" className="h-5" />
               </div>
               <p className="font-body text-sm text-ink-soft leading-relaxed">
-                Custom perler bead art and starter kits. Designed with love, delivered across the UK.
+                Custom perler bead art and starter kits. Designed with love, delivered across the UK and USA.
               </p>
             </div>
 
@@ -540,7 +593,7 @@ export function HomePage() {
               <h4 className="font-body font-extrabold text-ink text-sm uppercase tracking-[0.08em] mb-4">Shop</h4>
               <ul className="space-y-3">
                 <li><Link to="/products" className="font-body text-sm text-ink-soft hover:text-ink hover:underline decoration-[2px] underline-offset-4">Starter Kits</Link></li>
-                <li><Link to="/designer" className="font-body text-sm text-ink-soft hover:text-ink hover:underline decoration-[2px] underline-offset-4">AI Designer</Link></li>
+                <li><Link to="/designer" className="font-body text-sm text-ink-soft hover:text-ink hover:underline decoration-[2px] underline-offset-4">Designer</Link></li>
                 <li><Link to="/orders" className="font-body text-sm text-ink-soft hover:text-ink hover:underline decoration-[2px] underline-offset-4">My Orders</Link></li>
               </ul>
             </div>
@@ -557,9 +610,10 @@ export function HomePage() {
             <div>
               <h4 className="font-body font-extrabold text-ink text-sm uppercase tracking-[0.08em] mb-4">Legal</h4>
               <ul className="space-y-3">
-                <li><span className="font-body text-sm text-ink-hint">Privacy Policy</span></li>
-                <li><span className="font-body text-sm text-ink-hint">Terms of Service</span></li>
-                <li><span className="font-body text-sm text-ink-hint">Returns Policy</span></li>
+                <li><Link to="/legal/privacy" className="font-body text-sm text-ink-soft hover:text-ink hover:underline decoration-[2px] underline-offset-4">Privacy Policy</Link></li>
+                <li><Link to="/legal/terms" className="font-body text-sm text-ink-soft hover:text-ink hover:underline decoration-[2px] underline-offset-4">Terms of Service</Link></li>
+                <li><Link to="/legal/refunds" className="font-body text-sm text-ink-soft hover:text-ink hover:underline decoration-[2px] underline-offset-4">Refunds &amp; Returns</Link></li>
+                <li><Link to="/legal/shipping" className="font-body text-sm text-ink-soft hover:text-ink hover:underline decoration-[2px] underline-offset-4">Shipping</Link></li>
               </ul>
             </div>
           </div>
@@ -568,7 +622,7 @@ export function HomePage() {
             <p className="font-body text-sm text-ink-hint">&copy; 2026 Fusiey. All rights reserved.</p>
             <div className="flex items-center gap-3">
               <span className="fsy-tag">UK</span>
-              <span className="fsy-tag">GBP</span>
+              <span className="fsy-tag">USA</span>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
+import { GOOGLE_ENABLED } from '../config/google';
 import { useAuthStore } from '../store/useAuthStore';
 
 export function RegisterPage() {
@@ -10,14 +11,28 @@ export function RegisterPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
+  const [agreed, setAgreed] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const nextPath = new URLSearchParams(location.search).get('next') || '/designer';
+  const nextPath = new URLSearchParams(location.search).get('next') || '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (password.length < 8) {
+      setLocalError('Password must be at least 8 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setLocalError('Passwords do not match.');
+      return;
+    }
+    if (!agreed) {
+      setLocalError('Please agree to our Terms and Privacy Policy to continue.');
+      return;
+    }
     setBusy(true);
     setLocalError(null);
     try {
@@ -38,7 +53,7 @@ export function RegisterPage() {
       >
         <h1 className="font-cute font-bold text-ink text-2xl mb-1 text-center">Create account</h1>
         <p className="font-body text-ink-hint text-sm text-center mb-6">
-          3 free AI generations to get started.
+          Get started in seconds.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -75,6 +90,38 @@ export function RegisterPage() {
               className="h-10 px-3 bg-paper-warm border-[2px] border-ink/25 focus:border-ink rounded-[10px] font-body text-sm outline-none transition-colors"
             />
           </label>
+          <label className="flex flex-col gap-1 font-body text-[12px] text-ink-soft">
+            Confirm password
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={8}
+              className={`h-10 px-3 bg-paper-warm border-[2px] rounded-[10px] font-body text-sm outline-none transition-colors ${
+                confirmPassword && confirmPassword !== password
+                  ? 'border-red-400 focus:border-red-500'
+                  : 'border-ink/25 focus:border-ink'
+              }`}
+            />
+            {confirmPassword && confirmPassword !== password && (
+              <span className="text-red-500 text-[11px]">Passwords don't match</span>
+            )}
+          </label>
+          <label className="flex items-start gap-2 font-body text-[12px] text-ink-soft cursor-pointer select-none mt-1">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-[color:var(--color-ink)] shrink-0"
+            />
+            <span>
+              I agree to Fusiey's{' '}
+              <Link to="/legal/terms" target="_blank" className="text-ink font-semibold underline">Terms of Service</Link>
+              {' '}and{' '}
+              <Link to="/legal/privacy" target="_blank" className="text-ink font-semibold underline">Privacy Policy</Link>.
+            </span>
+          </label>
           {localError && (
             <p className="font-body text-[12px] text-red-600">{localError}</p>
           )}
@@ -88,31 +135,35 @@ export function RegisterPage() {
           </button>
         </form>
 
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-[1px] bg-ink/20" />
-          <span className="font-body text-[11px] text-ink-hint uppercase tracking-wider">or</span>
-          <div className="flex-1 h-[1px] bg-ink/20" />
-        </div>
+        {GOOGLE_ENABLED && (
+          <>
+            <div className="flex items-center gap-3 my-5">
+              <div className="flex-1 h-[1px] bg-ink/20" />
+              <span className="font-body text-[11px] text-ink-hint uppercase tracking-wider">or</span>
+              <div className="flex-1 h-[1px] bg-ink/20" />
+            </div>
 
-        <div className="flex justify-center">
-          <GoogleLogin
-            onSuccess={async (r) => {
-              if (!r.credential) return;
-              setBusy(true);
-              setLocalError(null);
-              try {
-                await loginWithGoogle(r.credential);
-                navigate(nextPath, { replace: true });
-              } catch (err: any) {
-                setLocalError(err.message || 'Google signup failed');
-              } finally {
-                setBusy(false);
-              }
-            }}
-            onError={() => setLocalError('Google signup failed')}
-            width="100%"
-          />
-        </div>
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={async (r) => {
+                  if (!r.credential) return;
+                  setBusy(true);
+                  setLocalError(null);
+                  try {
+                    await loginWithGoogle(r.credential);
+                    navigate(nextPath, { replace: true });
+                  } catch (err: any) {
+                    setLocalError(err.message || 'Google signup failed');
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                onError={() => setLocalError('Google signup failed')}
+                width="100%"
+              />
+            </div>
+          </>
+        )}
 
         <p className="font-body text-[12px] text-ink-hint text-center mt-6">
           Already have an account?{' '}

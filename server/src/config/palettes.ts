@@ -1,4 +1,4 @@
-import { Color } from '../types';
+import type { Color } from '../../../shared/types/index.js';
 
 export const PERLER_PALETTE: Color[] = [
   { id: 'p1', name: 'White', hex: '#FFFFFF', code: '01', brand: 'Perler' },

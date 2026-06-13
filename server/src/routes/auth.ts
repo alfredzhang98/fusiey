@@ -25,6 +25,8 @@ import {
   verifyRefreshToken,
 } from '../middleware/auth.js';
 import type { User } from '../../../generated/prisma/client.js';
+import { sendEmail } from '../services/emailService.js';
+import { passwordResetEmail } from '../services/emailTemplates.js';
 
 export const authRoutes = Router();
 
@@ -34,7 +36,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 function toPublicUser(user: User) {
   // Strip sensitive / internal fields before responding.
   const { passwordHash: _pw, googleId: _g, ...safe } = user as any;
-  return safe;
+  return { ...safe, hasPassword: !!user.passwordHash };
 }
 
 const registerSchema = z.object({
@@ -149,9 +151,151 @@ authRoutes.post('/google', async (req, res) => {
   return res.json({ user: toPublicUser(user) });
 });
 
+const profileUpdateSchema = z.object({
+  name: z.string().min(1).max(80).optional(),
+  email: z.string().email().max(200).optional(),
+});
+
+const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(200),
+});
+
 // ── GET /me ───────────────────────────────────────────────────────────
 authRoutes.get('/me', requireAuth, (req, res) => {
   return res.json({ user: toPublicUser(req.user!) });
+});
+
+// ── PATCH /me ─────────────────────────────────────────────────────────
+// Update profile fields (name, email). Email must not be taken by another user.
+authRoutes.patch('/me', requireAuth, async (req, res) => {
+  const parsed = profileUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+  }
+  const { name, email } = parsed.data;
+  if (!name && !email) return res.status(400).json({ error: 'No fields to update' });
+
+  const user = req.user!;
+
+  // If email is changing, check uniqueness.
+  if (email && email !== user.email) {
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing && existing.id !== user.id) {
+      return res.status(409).json({ error: 'Email already in use' });
+    }
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      ...(name ? { name } : {}),
+      ...(email && email !== user.email ? { email, emailVerified: false } : {}),
+    },
+  });
+
+  return res.json({ user: toPublicUser(updated) });
+});
+
+// ── PATCH /me/password ────────────────────────────────────────────────
+// Only works for email/password accounts (users with a passwordHash).
+authRoutes.patch('/me/password', requireAuth, async (req, res) => {
+  const parsed = passwordChangeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+  }
+
+  const user = req.user!;
+  if (!user.passwordHash) {
+    return res.status(400).json({ error: 'Google-only accounts have no password. Use Google to sign in.' });
+  }
+
+  const ok = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash);
+  if (!ok) return res.status(401).json({ error: 'Current password is incorrect' });
+
+  const passwordHash = await bcrypt.hash(parsed.data.newPassword, BCRYPT_ROUNDS);
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+
+  return res.json({ success: true });
+});
+
+// ── POST /forgot-password ─────────────────────────────────────────────
+// Sends a 6-digit reset code to the account email. Always returns success
+// (never reveals whether the email exists). Only email/password accounts
+// can reset; Google-only accounts are silently ignored.
+const forgotSchema = z.object({ email: z.string().email().max(200) });
+
+authRoutes.post('/forgot-password', async (req, res) => {
+  const parsed = forgotSchema.safeParse(req.body);
+  // Generic success regardless — don't leak account existence or validity.
+  if (!parsed.success) return res.json({ success: true });
+
+  const email = parsed.data.email.toLowerCase();
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (user && user.passwordHash) {
+    // Invalidate any earlier unused codes, then issue a fresh one.
+    await prisma.passwordReset.updateMany({
+      where: { userId: user.id, used: false },
+      data: { used: true },
+    });
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
+    await prisma.passwordReset.create({
+      data: {
+        userId: user.id,
+        codeHash,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      },
+    });
+    const mail = passwordResetEmail(code);
+    sendEmail({ ...mail, to: user.email }).catch(() => {});
+  }
+
+  return res.json({ success: true });
+});
+
+// ── POST /reset-password ──────────────────────────────────────────────
+// Verifies the 6-digit code and sets a new password.
+const resetSchema = z.object({
+  email: z.string().email().max(200),
+  code: z.string().length(6),
+  newPassword: z.string().min(8).max(200),
+});
+
+authRoutes.post('/reset-password', async (req, res) => {
+  const parsed = resetSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+  }
+  const email = parsed.data.email.toLowerCase();
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return res.status(400).json({ error: 'Invalid or expired code' });
+
+  const reset = await prisma.passwordReset.findFirst({
+    where: { userId: user.id, used: false },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (!reset || reset.expiresAt < new Date()) {
+    return res.status(400).json({ error: 'Invalid or expired code' });
+  }
+  if (reset.attempts >= 5) {
+    await prisma.passwordReset.update({ where: { id: reset.id }, data: { used: true } });
+    return res.status(429).json({ error: 'Too many attempts — request a new code.' });
+  }
+
+  const ok = await bcrypt.compare(parsed.data.code, reset.codeHash);
+  if (!ok) {
+    await prisma.passwordReset.update({ where: { id: reset.id }, data: { attempts: { increment: 1 } } });
+    return res.status(400).json({ error: 'Invalid or expired code' });
+  }
+
+  const passwordHash = await bcrypt.hash(parsed.data.newPassword, BCRYPT_ROUNDS);
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+    prisma.passwordReset.update({ where: { id: reset.id }, data: { used: true } }),
+  ]);
+
+  return res.json({ success: true });
 });
 
 // ── POST /logout ──────────────────────────────────────────────────────
