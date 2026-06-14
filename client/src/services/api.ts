@@ -104,6 +104,7 @@ export const authApi = {
       body: JSON.stringify(body),
     }),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
+  refresh: () => request<void>('/auth/refresh', { method: 'POST' }),
 };
 
 // ──────────────────────────────────────────────────────────────────────

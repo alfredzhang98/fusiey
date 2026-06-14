@@ -105,7 +105,7 @@ export function LoginPage() {
                   }
                 }}
                 onError={() => setLocalError('Google login failed')}
-                width="100%"
+                width={360}
               />
             </div>
           </>

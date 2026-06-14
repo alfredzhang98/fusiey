@@ -159,7 +159,7 @@ export function RegisterPage() {
                   }
                 }}
                 onError={() => setLocalError('Google signup failed')}
-                width="100%"
+                width={360}
               />
             </div>
           </>

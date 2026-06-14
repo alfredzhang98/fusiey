@@ -47,8 +47,19 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (epoch === authEpoch) set({ user, status: 'idle' });
       else set({ status: 'idle' });
     } catch (err) {
-      // 401 is expected when there's no cookie. Only clear the user if no
-      // manual auth happened while this request was in flight.
+      // access_token expired (401) — try to silently refresh using the
+      // long-lived refresh_token cookie before giving up.
+      if (err instanceof ApiError && err.status === 401) {
+        try {
+          await authApi.refresh();
+          const { user } = await authApi.me();
+          if (epoch === authEpoch) set({ user, status: 'idle' });
+          else set({ status: 'idle' });
+          return;
+        } catch {
+          // refresh also failed — user is genuinely not logged in
+        }
+      }
       if (epoch === authEpoch) set({ user: null, status: 'idle' });
       else set({ status: 'idle' });
     }
