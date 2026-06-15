@@ -37,7 +37,10 @@ const addressSchema = z.object({
 
 const checkoutSchema = z.object({
   items: z.array(itemSchema).min(1).max(30),
-  shippingAddress: addressSchema,
+  // Optional: digital-only orders (e.g. patterns) have nothing to ship, so they
+  // need no address — this is what lets international (e.g. US) buyers purchase
+  // a pattern. Physical orders still require it (enforced in the handlers).
+  shippingAddress: addressSchema.optional(),
   notes: z.string().max(1000).optional(),
   discountCode: z.string().max(40).optional(),
   currency: z.enum(['GBP', 'USD']).default('GBP'),
@@ -197,7 +200,7 @@ async function persistOrder(opts: {
   userId: string;
   items: CheckoutInput['items'];
   priced: Awaited<ReturnType<typeof priceCart>>;
-  shippingAddress: CheckoutInput['shippingAddress'];
+  shippingAddress?: CheckoutInput['shippingAddress'];
   notes?: string;
   currency: Region;
   paymentMethod: string;
@@ -211,7 +214,8 @@ async function persistOrder(opts: {
   const { subtotal, discountAmount, shipping, vatAmount, total, orderItems, allDigital, discountId } = priced;
 
   return prisma.$transaction(async (tx: any) => {
-    const addr = await tx.address.create({ data: { userId, ...shippingAddress } });
+    // Digital-only orders may have no shipping address.
+    const addr = shippingAddress ? await tx.address.create({ data: { userId, ...shippingAddress } }) : null;
     const created = await tx.order.create({
       data: {
         userId,
@@ -223,7 +227,7 @@ async function persistOrder(opts: {
         vatAmount,
         totalAmount: total,
         currency,
-        shippingAddressId: addr.id,
+        shippingAddressId: addr?.id ?? null,
         paymentMethod,
         paymentId,
         notes,
@@ -315,6 +319,9 @@ paymentRoutes.post('/paypal/capture-order', async (req, res) => {
     // Re-price from the DB and persist the order as paid. Digital-only orders
     // are delivered immediately (nothing to ship).
     const priced = await priceCart(items, currency, discountCode);
+    if (!priced.allDigital && !shippingAddress) {
+      return res.status(400).json({ error: 'A shipping address is required for physical items.' });
+    }
     const order = await persistOrder({
       userId: user.id,
       items,
@@ -346,6 +353,9 @@ paymentRoutes.post('/free-order', requireRole('ADMIN', 'SUPERADMIN'), async (req
   const { items, shippingAddress, notes, discountCode, currency } = parsed.data;
   try {
     const priced = await priceCart(items, currency, discountCode);
+    if (!priced.allDigital && !shippingAddress) {
+      return res.status(400).json({ error: 'A shipping address is required for physical items.' });
+    }
     const taggedNotes = `[ADMIN TEST] ${notes ?? ''}`.trim();
     const order = await persistOrder({
       userId: user.id,

@@ -498,7 +498,7 @@ export interface CreateOrderInput {
 
 export interface PaypalCheckoutInput {
   items: { productId: string; patternId?: string; quantity: number; customisation?: Record<string, string> }[];
-  shippingAddress: OrderAddress;
+  shippingAddress?: OrderAddress; // omitted for digital-only orders (no shipping)
   notes?: string;
   discountCode?: string;
 }

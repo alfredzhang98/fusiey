@@ -67,6 +67,9 @@ export function CheckoutPage() {
   const round2 = (n: number) => Math.round(n * 100) / 100;
   // Items not sold in the active region (no price for this currency).
   const unavailable = items.filter((i) => unitPriceFor(i, currency) == null);
+  // Digital-only cart (e.g. patterns) needs no shipping address — this is what
+  // lets international (e.g. US) customers buy a pattern.
+  const allDigital = items.length > 0 && items.every((i) => i.category === 'pattern');
   const sub = subtotal(currency);
   const discountAmount = round2(sub * (percentOff / 100));
   const discountedGoods = round2(sub - discountAmount);
@@ -119,7 +122,8 @@ export function CheckoutPage() {
       patternId: i.patternId,
       quantity: i.quantity,
     })),
-    shippingAddress: {
+    // Digital-only orders ship nothing, so we send no address.
+    shippingAddress: allDigital ? undefined : {
       line1: address.line1.trim(),
       line2: address.line2.trim() || undefined,
       city: address.city.trim(),
@@ -140,8 +144,8 @@ export function CheckoutPage() {
     setError(null);
     try {
       const payload = buildPayload();
-      // Convenience: admins can place a test order without filling the address.
-      if (!payload.shippingAddress.line1) {
+      // Convenience: for physical test orders, fill a default address if blank.
+      if (!allDigital && !payload.shippingAddress?.line1) {
         payload.shippingAddress = {
           line1: 'Admin test address', line2: undefined, city: 'London',
           county: undefined, postcode: 'SW1A 1AA', country: 'GB',
@@ -246,7 +250,8 @@ export function CheckoutPage() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Left: address + notes */}
           <div className="lg:col-span-3 space-y-6">
-            {/* Shipping Address */}
+            {/* Shipping Address — physical orders only; digital needs none */}
+            {!allDigital ? (
             <div className="fsy-card space-y-4">
               <div className="flex items-center gap-2 mb-1">
                 <MapPin className="w-5 h-5 text-ink" />
@@ -311,6 +316,17 @@ export function CheckoutPage() {
                 </label>
               </div>
             </div>
+            ) : (
+              <div className="fsy-card flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-ink shrink-0 mt-0.5" />
+                <div>
+                  <h2 className="font-cute font-bold text-ink text-lg">Digital delivery</h2>
+                  <p className="font-body text-ink-hint text-sm mt-0.5">
+                    No shipping needed — your pattern lands in My Works right after checkout.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Notes */}
             <div className="fsy-card space-y-3">
@@ -549,7 +565,7 @@ export function CheckoutPage() {
                         forceReRender={[total, currency]}
                         createOrder={async () => {
                           setError(null);
-                          if (!validateAddress()) {
+                          if (!allDigital && !validateAddress()) {
                             setError('Please complete your shipping address first.');
                             throw new Error('invalid-address');
                           }
