@@ -129,7 +129,16 @@ patternRoutes.get('/purchases', async (req, res) => {
     where: { userId: req.user!.id },
     orderBy: { createdAt: 'desc' },
   });
-  return res.json({ purchases });
+  // Attach each product's first image as a cover thumbnail (PatternPurchase
+  // stores only the file). Falls back to null if the product was deleted.
+  const productIds = [...new Set(purchases.map((p) => p.productId))];
+  const products = productIds.length
+    ? await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, images: true } })
+    : [];
+  const coverById = new Map(products.map((p) => [p.id, p.images[0] ?? null]));
+  return res.json({
+    purchases: purchases.map((p) => ({ ...p, coverImage: coverById.get(p.productId) ?? null })),
+  });
 });
 
 // ── GET /patterns/:id/thumbnail — cached PNG, no base64 in list JSON ────

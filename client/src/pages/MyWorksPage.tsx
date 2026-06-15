@@ -206,11 +206,13 @@ export function MyWorksPage() {
             {certified.map(patternCard)}
             {downloads.map((d) => {
               const files = d.fileUrls?.length ? d.fileUrls : [d.fileUrl];
+              // Prefer the product cover; fall back to the first PNG; else an icon.
+              const cover = d.coverImage || (d.fileType === 'png' ? files[0] : null);
               return (
                 <div key={d.id} className="bg-paper border-[2px] border-ink/30 rounded-[14px] overflow-hidden">
                   <div className="w-full aspect-square overflow-hidden bg-paper-warm flex items-center justify-center">
-                    {d.fileType === 'png' ? (
-                      <img src={files[0]} alt={d.name} loading="lazy" onError={imgFallback} className="w-full h-full object-contain" />
+                    {cover ? (
+                      <img src={cover} alt={d.name} loading="lazy" onError={imgFallback} className="w-full h-full object-contain" />
                     ) : (
                       <FileText className="w-12 h-12 text-ink-hint" />
                     )}

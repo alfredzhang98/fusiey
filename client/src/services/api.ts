@@ -211,6 +211,7 @@ export interface PatternPurchase {
   fileUrl: string;        // legacy: first file
   fileUrls?: string[];    // all delivered files (1 for pdf, 1..N for png)
   fileType: 'pdf' | 'png';
+  coverImage?: string | null; // product's first image, for the card thumbnail
   createdAt: string;
 }
 
