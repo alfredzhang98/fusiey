@@ -11,12 +11,47 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+// ── Session expiry ──────────────────────────────────────────────────────
+// The access cookie lives ~15 min; the refresh cookie ~30 days. When a request
+// 401s mid-session we silently refresh the access token and retry once. Only if
+// the refresh ALSO fails is the session genuinely over — then we notify the app
+// (registered by App) to clear the user and bounce to login, instead of showing
+// a confusing "Not authenticated" error.
+let sessionExpiredHandler: (() => void) | null = null;
+export function setSessionExpiredHandler(fn: (() => void) | null) {
+  sessionExpiredHandler = fn;
+}
+
+// Dedup concurrent refreshes so a burst of 401s triggers a single /auth/refresh.
+let refreshPromise: Promise<boolean> | null = null;
+function refreshSession(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_BASE}/auth/refresh`, { method: 'POST', credentials: 'include' })
+      .then((r) => r.ok)
+      .catch(() => false)
+      .finally(() => { refreshPromise = null; });
+  }
+  return refreshPromise;
+}
+
+// Auth endpoints must NOT trigger refresh-and-retry: their 401s are meaningful
+// (wrong password, or boot-time /me with no session) and retrying would loop.
+const AUTH_PATHS = ['/auth/login', '/auth/register', '/auth/google', '/auth/refresh', '/auth/me', '/auth/logout'];
+const isAuthPath = (p: string) => AUTH_PATHS.some((a) => p.startsWith(a));
+
+async function request<T>(path: string, options?: RequestInit, _retried = false): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'include', // send/receive httpOnly auth cookies
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
+
+  // Token expired mid-session — refresh once, then retry the original request.
+  if (res.status === 401 && !_retried && !isAuthPath(path)) {
+    if (await refreshSession()) return request<T>(path, options, true);
+    sessionExpiredHandler?.(); // refresh failed → truly logged out
+    throw new ApiError(401, 'Your session has expired. Please sign in again.');
+  }
 
   if (res.status === 204) return undefined as unknown as T;
   const contentType = res.headers.get('content-type') || '';
@@ -40,6 +75,7 @@ function uploadRequest<T>(
   path: string,
   form: FormData,
   onProgress?: (pct: number) => void,
+  _retried = false,
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -53,6 +89,15 @@ function uploadRequest<T>(
     }
 
     xhr.onload = () => {
+      // Token expired mid-session — refresh once, then retry the upload.
+      if (xhr.status === 401 && !_retried && !isAuthPath(path)) {
+        refreshSession().then((ok) => {
+          if (ok) return resolve(uploadRequest<T>(path, form, onProgress, true));
+          sessionExpiredHandler?.();
+          reject(new ApiError(401, 'Your session has expired. Please sign in again.'));
+        });
+        return;
+      }
       const ct = xhr.getResponseHeader('content-type') || '';
       let data: any = {};
       if (ct.includes('application/json')) {

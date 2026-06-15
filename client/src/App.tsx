@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Menu, X, Home, Palette, Package, BookMarked, UserRound, ShoppingCart, type LucideIcon } from 'lucide-react';
 import { cn } from './lib/utils';
+import { setSessionExpiredHandler } from './services/api';
 import { useAuthStore } from './store/useAuthStore';
 import { useCartStore } from './store/useCartStore';
 import { useCurrencyStore } from './store/useCurrencyStore';
@@ -21,8 +22,10 @@ const AUTH_NAV_ITEMS: { path: string; label: string; icon: LucideIcon }[] = [
 
 export default function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, fetchMe, logout } = useAuthStore();
+  const setUser = useAuthStore((s) => s.setUser);
   const cartCount = useCartStore((s) => s.itemCount());
   const initFromGeo = useCurrencyStore((s) => s.initFromGeo);
 
@@ -31,6 +34,19 @@ export default function App() {
     fetchMe();
     initFromGeo();
   }, [fetchMe, initFromGeo]);
+
+  // When the session truly expires (refresh failed), auto-logout and bounce to
+  // login instead of letting a confusing "Not authenticated" error surface.
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      setUser(null);
+      const onAuthPage = ['/login', '/register'].includes(window.location.pathname);
+      if (!onAuthPage) {
+        navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`, { replace: true });
+      }
+    });
+    return () => setSessionExpiredHandler(null);
+  }, [navigate, setUser]);
 
   const navItems = user ? [...NAV_ITEMS, ...AUTH_NAV_ITEMS] : NAV_ITEMS;
 
