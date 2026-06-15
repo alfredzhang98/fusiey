@@ -102,7 +102,7 @@ async function priceCart(items: CheckoutInput['items'], currency: Region, discou
       customisation: item.customisation || undefined,
     });
     // A pattern product carries a deliverable: certified JSON or a download file.
-    if (product.category === 'pattern' && (product.patternData || product.patternFileUrl)) {
+    if (product.category === 'pattern' && (product.patternData || product.patternFileUrl || product.patternFileUrls?.length)) {
       deliverables.set(product.id, product);
     }
   }
@@ -165,13 +165,17 @@ async function deliverPatterns(tx: any, userId: string, deliverables: any[]) {
             sourceProductId: product.id,
           },
         });
-      } else if (product.patternFileUrl) {
+      } else if (product.patternFileUrl || product.patternFileUrls?.length) {
+        const fileUrls: string[] = product.patternFileUrls?.length
+          ? product.patternFileUrls
+          : [product.patternFileUrl];
         await tx.patternPurchase.create({
           data: {
             userId,
             productId: product.id,
             name: product.name,
-            fileUrl: product.patternFileUrl,
+            fileUrl: fileUrls[0],
+            fileUrls,
             fileType: product.patternFileType || 'pdf',
           },
         });

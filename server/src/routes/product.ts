@@ -65,6 +65,7 @@ const baseProductSchema = z.object({
   isCertifiedPattern: z.boolean().optional(),
   patternData: patternDataSchema.nullable().optional(),
   patternFileUrl: z.string().max(500).nullable().optional(),
+  patternFileUrls: z.array(z.string().max(500)).max(50).nullable().optional(),
   patternFileType: z.enum(['pdf', 'png']).nullable().optional(),
 });
 
@@ -94,7 +95,10 @@ function formatProduct(p: any, admin = false) {
     hasPatternData: p.patternData != null,
   };
   delete out.patternData;
-  if (!admin) out.patternFileUrl = null; // non-buyers can't grab the deliverable
+  if (!admin) {
+    out.patternFileUrl = null; // non-buyers can't grab the deliverable
+    out.patternFileUrls = [];
+  }
   return out;
 }
 
@@ -102,6 +106,18 @@ function formatProduct(p: any, admin = false) {
 function normalisePatternFields(data: any, existing?: any) {
   if (data.category === 'pattern') data.isDigital = true;
   const certified = data.isCertifiedPattern ?? existing?.isCertifiedPattern;
+
+  // Keep the legacy single-file column (patternFileUrl) in sync with the array
+  // (patternFileUrls), whichever the client supplied. PDF carries one file;
+  // PNG may carry several. `undefined` means "not touched" on a PATCH.
+  if (data.patternFileUrls !== undefined) {
+    const arr = (data.patternFileUrls || []).filter(Boolean);
+    data.patternFileUrls = arr;
+    data.patternFileUrl = arr[0] ?? null;
+  } else if (data.patternFileUrl !== undefined) {
+    data.patternFileUrls = data.patternFileUrl ? [data.patternFileUrl] : [];
+  }
+
   const hasJson = data.patternData !== undefined ? data.patternData != null : existing?.patternData != null;
   if (certified && !hasJson) {
     return 'Certified patterns require an uploaded pattern JSON.';
@@ -203,7 +219,7 @@ productRoutes.get('/admin', requireAuth, requireRole('ADMIN', 'SUPERADMIN'), asy
         priceGBP: true, priceUSD: true, images: true, category: true,
         stock: true, lowStockThreshold: true, isCustomisable: true, isDigital: true,
         isActive: true, tags: true, isCertifiedPattern: true,
-        patternFileUrl: true, patternFileType: true,
+        patternFileUrl: true, patternFileUrls: true, patternFileType: true,
         createdAt: true, updatedAt: true,
       },
     }),
@@ -323,9 +339,12 @@ productRoutes.delete('/:id/permanent', async (req, res) => {
     });
   }
 
-  // Best-effort cleanup of the non-certified pattern file on disk.
-  if (existing.patternFileUrl) {
-    const abs = absFromPublicUrl(existing.patternFileUrl);
+  // Best-effort cleanup of the non-certified pattern file(s) on disk.
+  const fileUrls = existing.patternFileUrls?.length
+    ? existing.patternFileUrls
+    : (existing.patternFileUrl ? [existing.patternFileUrl] : []);
+  for (const u of fileUrls) {
+    const abs = absFromPublicUrl(u);
     if (abs) { try { fs.unlinkSync(abs); } catch { /* ignore */ } }
   }
 

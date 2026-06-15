@@ -4,6 +4,7 @@ import { Trash2, Upload, Loader2, Package, Download, FileText, ShoppingBag } fro
 import { patternsApi, type PatternSummary, type PatternPurchase, ApiError } from '../services/api';
 import { renderThumbnail } from '../utils/patternThumbnail';
 import { PALETTES } from '../constants/palettes';
+import { imgFallback } from '../lib/utils';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 const PAGE_SIZE = 12;
@@ -203,32 +204,54 @@ export function MyWorksPage() {
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 sm:gap-4">
             {certified.map(patternCard)}
-            {downloads.map((d) => (
-              <div key={d.id} className="bg-paper border-[2px] border-ink/30 rounded-[14px] overflow-hidden">
-                <div className="w-full aspect-square overflow-hidden bg-paper-warm flex items-center justify-center">
-                  {d.fileType === 'png' ? (
-                    <img src={d.fileUrl} alt={d.name} loading="lazy" className="w-full h-full object-contain" />
-                  ) : (
-                    <FileText className="w-12 h-12 text-ink-hint" />
-                  )}
-                </div>
-                <div className="p-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-cute font-semibold text-ink text-sm truncate flex-1">{d.name}</span>
-                    <span className="font-pixel-mono text-[9px] text-ink bg-sky-candy px-1.5 py-0.5 rounded">{d.fileType.toUpperCase()}</span>
+            {downloads.map((d) => {
+              const files = d.fileUrls?.length ? d.fileUrls : [d.fileUrl];
+              return (
+                <div key={d.id} className="bg-paper border-[2px] border-ink/30 rounded-[14px] overflow-hidden">
+                  <div className="w-full aspect-square overflow-hidden bg-paper-warm flex items-center justify-center">
+                    {d.fileType === 'png' ? (
+                      <img src={files[0]} alt={d.name} loading="lazy" onError={imgFallback} className="w-full h-full object-contain" />
+                    ) : (
+                      <FileText className="w-12 h-12 text-ink-hint" />
+                    )}
                   </div>
-                  <a
-                    href={d.fileUrl}
-                    download
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-2 w-full fsy-btn fsy-btn-sm bg-cotton gap-1.5 justify-center"
-                  >
-                    <Download className="w-4 h-4" /> Download
-                  </a>
+                  <div className="p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-cute font-semibold text-ink text-sm truncate flex-1">{d.name}</span>
+                      <span className="font-pixel-mono text-[9px] text-ink bg-sky-candy px-1.5 py-0.5 rounded">
+                        {d.fileType.toUpperCase()}{files.length > 1 ? ` ×${files.length}` : ''}
+                      </span>
+                    </div>
+                    {files.length === 1 ? (
+                      <a
+                        href={files[0]}
+                        download
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 w-full fsy-btn fsy-btn-sm bg-cotton gap-1.5 justify-center"
+                      >
+                        <Download className="w-4 h-4" /> Download
+                      </a>
+                    ) : (
+                      <div className="mt-2 flex flex-col gap-1.5">
+                        {files.map((u, i) => (
+                          <a
+                            key={u}
+                            href={u}
+                            download
+                            target="_blank"
+                            rel="noreferrer"
+                            className="w-full fsy-btn fsy-btn-sm bg-cotton gap-1.5 justify-center"
+                          >
+                            <Download className="w-4 h-4" /> Page {i + 1}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}

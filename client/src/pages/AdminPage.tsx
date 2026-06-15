@@ -847,8 +847,11 @@ function ProductForm({
   // Pattern deliverables
   const [isCertified, setIsCertified] = useState(initial?.isCertifiedPattern || false);
   const [patternData, setPatternData] = useState<PatternData | null>(null);
-  const [patternFile, setPatternFile] = useState<{ url: string; type: 'pdf' | 'png' } | null>(
-    initial?.patternFileUrl ? { url: initial.patternFileUrl, type: (initial.patternFileType as any) || 'pdf' } : null,
+  const [patternFiles, setPatternFiles] = useState<{ url: string; type: 'pdf' | 'png' }[]>(
+    (initial?.patternFileUrls?.length
+      ? initial.patternFileUrls
+      : initial?.patternFileUrl ? [initial.patternFileUrl] : []
+    ).map((url) => ({ url, type: (initial?.patternFileType as any) || 'pdf' })),
   );
   const [patternMsg, setPatternMsg] = useState<string | null>(null);
   const [patternPct, setPatternPct] = useState<number | null>(null);
@@ -925,21 +928,39 @@ function ProductForm({
     reader.readAsText(file);
   };
 
-  const onPatternFile = async (file: File) => {
+  const onPatternFile = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const list = Array.from(files);
     setPatternMsg(null);
+    setError(null);
     setPatternPct(0);
     try {
-      const res = await productsApi.uploadPatternFile(file, setPatternPct);
-      setPatternFile(res);
-      setPatternMsg(`✓ ${res.type.toUpperCase()} uploaded`);
-      setError(null);
+      const uploaded: { url: string; type: 'pdf' | 'png' }[] = [];
+      for (let i = 0; i < list.length; i++) {
+        // Overall percent across the batch: completed files + current file's progress.
+        const res = await productsApi.uploadPatternFile(list[i], (p) =>
+          setPatternPct(Math.round(((i + p / 100) / list.length) * 100)),
+        );
+        uploaded.push(res);
+      }
+      setPatternFiles((prev) => {
+        // A PDF is always a single deliverable — it replaces everything.
+        const pdf = uploaded.find((u) => u.type === 'pdf');
+        if (pdf) return [pdf];
+        // PNGs accumulate; if the previous deliverable was a PDF, drop it.
+        const merged = prev.filter((p) => p.type === 'png');
+        for (const u of uploaded) if (!merged.some((m) => m.url === u.url)) merged.push(u);
+        return merged;
+      });
+      setPatternMsg(uploaded.length > 1 ? `✓ ${uploaded.length} files uploaded` : `✓ ${uploaded[0].type.toUpperCase()} uploaded`);
     } catch (err: any) {
-      setPatternMsg(null);
       setError(err.message || 'Upload failed');
     } finally {
       setPatternPct(null);
     }
   };
+
+  const removePatternFile = (i: number) => setPatternFiles((prev) => prev.filter((_, idx) => idx !== i));
 
   const handleSubmit = async () => {
     if (!name || !description || !priceGBP || images.length === 0) {
@@ -950,8 +971,8 @@ function ProductForm({
       setError('Certified patterns need a pattern JSON file.');
       return;
     }
-    if (isPattern && !isCertified && !patternFile) {
-      setError('Non-certified patterns need a PDF or PNG file to deliver.');
+    if (isPattern && !isCertified && patternFiles.length === 0) {
+      setError('Non-certified patterns need at least one PDF or PNG file to deliver.');
       return;
     }
     setBusy(true);
@@ -974,10 +995,12 @@ function ProductForm({
         if (isCertified) {
           if (patternData) body.patternData = patternData; // only when (re)uploaded
           body.patternFileUrl = null;
+          body.patternFileUrls = [];
           body.patternFileType = null;
         } else {
           body.patternData = null;
-          if (patternFile) { body.patternFileUrl = patternFile.url; body.patternFileType = patternFile.type; }
+          body.patternFileUrls = patternFiles.map((f) => f.url);
+          body.patternFileType = patternFiles[0]?.type ?? null;
         }
       } else {
         body.isCertifiedPattern = false;
@@ -1112,27 +1135,44 @@ function ProductForm({
               )}
             </div>
           ) : (
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <label className="fsy-btn fsy-btn-sm bg-paper gap-1.5 cursor-pointer w-fit">
-                <FileText className="w-3.5 h-3.5" /> Upload pattern file (PDF or PNG)
-                <input type="file" accept="application/pdf,image/png,.pdf,.png" className="hidden"
-                  onChange={(e) => e.target.files?.[0] && onPatternFile(e.target.files[0])} />
+                <FileText className="w-3.5 h-3.5" /> Upload pattern file(s) — PDF or PNG
+                <input type="file" accept="application/pdf,image/png,.pdf,.png" multiple className="hidden"
+                  onChange={(e) => { onPatternFile(e.target.files); e.target.value = ''; }} />
               </label>
-              {patternFile && (
-                <p className="font-body text-[11px] text-ink-soft">
-                  ✓ <a href={patternFile.url} target="_blank" rel="noreferrer" className="underline">{patternFile.type.toUpperCase()} on file</a> (upload to replace)
-                </p>
+              <p className="font-body text-[11px] text-ink-hint">
+                A PDF is delivered as a single file. PNG patterns can have multiple pages — upload several and they're delivered together.
+              </p>
+              {patternFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {patternFiles.map((f, i) => (
+                    <div key={f.url} className="relative w-20 h-20 rounded-[10px] border-[2px] border-ink/30 overflow-hidden group bg-paper-warm">
+                      <a href={f.url} target="_blank" rel="noreferrer" className="block w-full h-full flex items-center justify-center">
+                        {f.type === 'png'
+                          ? <img src={f.url} alt="" onError={imgFallback} className="w-full h-full object-cover" />
+                          : <span className="font-pixel-mono text-[11px] text-ink">PDF</span>}
+                      </a>
+                      {f.type === 'png' && patternFiles.length > 1 && (
+                        <span className="absolute bottom-0 left-0 bg-ink/70 text-paper text-[8px] px-1 rounded-tr">{i + 1}</span>
+                      )}
+                      <button type="button" onClick={() => removePatternFile(i)} title="Remove"
+                        className="absolute top-0 right-0 bg-ink/60 text-paper px-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
-              {patternPct !== null ? (
+              {patternPct !== null && (
                 <div className="max-w-xs">
                   <div className="h-2 rounded-full bg-ink/10 border border-ink/20 overflow-hidden">
                     <div className="h-full bg-cotton transition-[width] duration-150" style={{ width: `${patternPct}%` }} />
                   </div>
                   <p className="font-body text-[11px] text-ink-soft mt-1">Uploading… {patternPct}%</p>
                 </div>
-              ) : (
-                patternMsg && !patternFile && <p className="font-body text-[11px] text-ink-soft">{patternMsg}</p>
               )}
+              {patternMsg && patternPct === null && <p className="font-body text-[11px] text-ink-soft">{patternMsg}</p>}
             </div>
           )}
         </div>

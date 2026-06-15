@@ -136,7 +136,11 @@ model Product {
   // carry a downloadable file (PDF/PNG) the buyer downloads from My Works.
   isCertifiedPattern Boolean  @default(false)
   patternData        Json?    // certified: editable pattern { name,width,height,grid,paletteId,beadSize }
-  patternFileUrl     String?  // non-certified: /uploads/patterns/... download
+  // Non-certified deliverable(s). A PDF pattern is always a single file; a PNG
+  // pattern may be multiple pages/files. patternFileUrls is the source of truth;
+  // patternFileUrl mirrors the first entry for backwards compatibility.
+  patternFileUrl     String?  // legacy: first deliverable (/uploads/patterns/...)
+  patternFileUrls    String[] @default([]) // all deliverable files (1 for pdf, 1..N for png)
   patternFileType    String?  // 'pdf' | 'png'
   tags               String[]
   isActive           Boolean  @default(true)
@@ -362,7 +366,8 @@ model PatternPurchase {
   userId    String
   productId String
   name      String
-  fileUrl   String   // /uploads/patterns/...
+  fileUrl   String   // legacy: first delivered file (/uploads/patterns/...)
+  fileUrls  String[] @default([]) // all delivered files (1 for pdf, 1..N for png)
   fileType  String   // 'pdf' | 'png'
   createdAt DateTime @default(now())
 

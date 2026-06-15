@@ -208,7 +208,8 @@ export interface PatternPurchase {
   id: string;
   productId: string;
   name: string;
-  fileUrl: string;
+  fileUrl: string;        // legacy: first file
+  fileUrls?: string[];    // all delivered files (1 for pdf, 1..N for png)
   fileType: 'pdf' | 'png';
   createdAt: string;
 }
@@ -265,7 +266,8 @@ export interface ProductItem {
   tags: string[];
   // Pattern deliverables (pattern category only).
   isCertifiedPattern?: boolean;
-  patternFileUrl?: string | null;   // admin responses only; null publicly
+  patternFileUrl?: string | null;   // admin responses only; null publicly (legacy single file)
+  patternFileUrls?: string[];       // admin responses only; [] publicly (1 for pdf, 1..N for png)
   patternFileType?: 'pdf' | 'png' | null;
   hasPatternData?: boolean;
   createdAt: string;
