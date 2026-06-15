@@ -5,6 +5,7 @@ import { patternsApi, productsApi, type PatternSummary, type ProductItem, ApiErr
 import { useCartStore } from '../store/useCartStore';
 import { useCurrencyStore, formatPrice, regionPrice, isAvailable } from '../store/useCurrencyStore';
 import { PRODUCT_CATEGORIES } from '../constants/productCategories';
+import { imgFallback } from '../lib/utils';
 
 // Only these three categories can be added to a custom-pattern order.
 const ACCESSORY_CATS = ['beads', 'refill', 'tool'] as const;
@@ -189,7 +190,7 @@ export function CustomOrderPage() {
                           <div key={a.id} className="flex items-center gap-3 bg-paper border-[2px] border-ink/25 rounded-[10px] p-2">
                             <div className="w-14 h-14 rounded-[8px] bg-paper-warm border border-ink/20 overflow-hidden shrink-0">
                               {a.images[0]
-                                ? <img src={a.images[0]} alt={a.name} loading="lazy" className="w-full h-full object-cover" />
+                                ? <img src={a.images[0]} alt={a.name} loading="lazy" onError={imgFallback} className="w-full h-full object-cover" />
                                 : <div className="w-full h-full flex items-center justify-center"><Package className="w-6 h-6 text-ink-hint" /></div>}
                             </div>
                             <div className="flex-1 min-w-0">

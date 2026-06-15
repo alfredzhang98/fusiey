@@ -30,19 +30,41 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return data as T;
 }
 
-/** Multipart upload — must NOT set Content-Type (browser adds the boundary). */
-async function uploadRequest<T>(path: string, form: FormData): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    credentials: 'include',
-    body: form,
+/**
+ * Multipart upload — must NOT set Content-Type (browser adds the boundary).
+ * Uses XHR (not fetch) so we can report upload progress: `onProgress(pct)` is
+ * called with 0–100 as bytes are sent. Falls back gracefully if the browser
+ * can't compute progress (the bar just won't move until completion).
+ */
+function uploadRequest<T>(
+  path: string,
+  form: FormData,
+  onProgress?: (pct: number) => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}${path}`);
+    xhr.withCredentials = true; // send/receive httpOnly auth cookies
+
+    if (onProgress && xhr.upload) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+    }
+
+    xhr.onload = () => {
+      const ct = xhr.getResponseHeader('content-type') || '';
+      let data: any = {};
+      if (ct.includes('application/json')) {
+        try { data = JSON.parse(xhr.responseText); } catch { data = {}; }
+      }
+      if (xhr.status === 204) return resolve(undefined as unknown as T);
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(data as T);
+      reject(new ApiError(xhr.status, data.error || `HTTP ${xhr.status}`, data));
+    };
+    xhr.onerror = () => reject(new ApiError(0, 'Network error during upload'));
+    xhr.send(form);
   });
-  if (res.status === 204) return undefined as unknown as T;
-  const data = (res.headers.get('content-type') || '').includes('application/json')
-    ? await res.json().catch(() => ({}))
-    : {};
-  if (!res.ok) throw new ApiError(res.status, data.error || `HTTP ${res.status}`, data);
-  return data as T;
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -303,10 +325,10 @@ export const productsApi = {
   /** Permanently delete a product (and its pattern file). Blocked if it has orders. */
   permanentRemove: (id: string) => request<void>(`/products/${id}/permanent`, { method: 'DELETE' }),
   /** Upload a non-certified pattern deliverable (PDF or PNG). */
-  uploadPatternFile: (file: File) => {
+  uploadPatternFile: (file: File, onProgress?: (pct: number) => void) => {
     const form = new FormData();
     form.append('file', file);
-    return uploadRequest<{ url: string; type: 'pdf' | 'png' }>('/products/pattern-file', form);
+    return uploadRequest<{ url: string; type: 'pdf' | 'png' }>('/products/pattern-file', form, onProgress);
   },
 };
 
@@ -344,12 +366,12 @@ export const mediaApi = {
   deleteFolder: (id: string) => request<void>(`/media/folders/${id}`, { method: 'DELETE' }),
   listAssets: (folderId: string) =>
     request<{ folder: MediaFolder; assets: MediaAsset[] }>(`/media/folders/${folderId}/assets`),
-  uploadAssets: async (folderId: string, files: File[]) => {
+  uploadAssets: async (folderId: string, files: File[], onProgress?: (pct: number) => void) => {
     const form = new FormData();
     // Compress to ~1MB client-side before uploading.
     const compressed = await Promise.all(files.map((f) => compressImage(f)));
     compressed.forEach((f) => form.append('files', f));
-    return uploadRequest<{ assets: MediaAsset[] }>(`/media/folders/${folderId}/assets`, form);
+    return uploadRequest<{ assets: MediaAsset[] }>(`/media/folders/${folderId}/assets`, form, onProgress);
   },
   deleteAsset: (id: string) => request<void>(`/media/assets/${id}`, { method: 'DELETE' }),
 };

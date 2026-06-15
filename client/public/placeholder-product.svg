@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400" role="img" aria-label="No image">
+  <rect width="400" height="400" fill="#FDF7F6"/>
+  <g fill="none" stroke="#8F6A93" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity="0.55">
+    <!-- simple parcel / package -->
+    <path d="M200 120 L284 164 L284 252 L200 296 L116 252 L116 164 Z"/>
+    <path d="M116 164 L200 208 L284 164"/>
+    <path d="M200 208 L200 296"/>
+    <path d="M158 142 L242 186"/>
+  </g>
+  <text x="200" y="346" text-anchor="middle" font-family="Verdana, Geneva, sans-serif" font-size="22" fill="#8F6A93" opacity="0.7">No image</text>
+</svg>

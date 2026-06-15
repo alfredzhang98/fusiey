@@ -7,7 +7,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { ordersApi, type OrderDetail, type OrderStatusEnum } from '../services/api';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { cn } from '../lib/utils';
+import { cn, imgFallback } from '../lib/utils';
 
 const STATUS_CONFIG: Record<OrderStatusEnum, { label: string; icon: typeof Package; bg: string }> = {
   PENDING:    { label: 'Pending',    icon: Clock,         bg: 'bg-butter' },
@@ -255,7 +255,7 @@ export function OrderPage() {
                             >
                               <div className="w-10 h-10 rounded-[6px] bg-paper border border-ink/30 overflow-hidden shrink-0">
                                 {item.product?.images?.[0] && (
-                                  <img src={item.product.images[0]} alt="" className="w-full h-full object-cover" />
+                                  <img src={item.product.images[0]} alt="" onError={imgFallback} className="w-full h-full object-cover" />
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">

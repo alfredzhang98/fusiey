@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ArrowRight, Package } from 'lucide-react';
 import type { ProductItem } from '../services/api';
 import { useCurrencyStore, formatPrice, regionPrice } from '../store/useCurrencyStore';
-import { cn } from '../lib/utils';
+import { cn, imgFallback } from '../lib/utils';
 
 const SLIDE_BG = ['bg-cotton', 'bg-butter', 'bg-mint', 'bg-lilac', 'bg-sky-candy'];
 
@@ -65,7 +65,7 @@ export function HeroCarousel({ slides }: { slides: ProductItem[] }) {
             {/* Image */}
             <div className="hidden sm:block w-[44%] shrink-0 border-l-[2px] border-ink/15">
               {p.images[0] ? (
-                <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
+                <img src={p.images[0]} alt={p.name} onError={imgFallback} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <Package className="w-16 h-16 text-ink/30" />

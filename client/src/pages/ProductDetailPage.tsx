@@ -8,7 +8,7 @@ import { productsApi, configApi, type ProductItem, type ShippingConfig } from '.
 import { useCartStore } from '../store/useCartStore';
 import { PRODUCT_CATEGORIES } from '../constants/productCategories';
 import { useCurrencyStore, formatPrice, vatPortion, regionPrice } from '../store/useCurrencyStore';
-import { cn } from '../lib/utils';
+import { cn, imgFallback } from '../lib/utils';
 
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -108,7 +108,7 @@ export function ProductDetailPage() {
         <div className="flex flex-col gap-3">
           <div className="aspect-square rounded-[20px] border-[2px] border-ink overflow-hidden bg-paper-warm" style={{ boxShadow: '4px 4px 0 0 var(--color-ink)' }}>
             {product.images[imgIdx] ? (
-              <img src={product.images[imgIdx]} alt={product.name} className="w-full h-full object-cover" />
+              <img src={product.images[imgIdx]} alt={product.name} onError={imgFallback} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Package className="w-16 h-16 text-ink-hint" />
@@ -126,7 +126,7 @@ export function ProductDetailPage() {
                     i === imgIdx ? 'border-ink' : 'border-ink/20 hover:border-ink',
                   )}
                 >
-                  <img src={src} alt="" className="w-full h-full object-cover" />
+                  <img src={src} alt="" onError={imgFallback} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>

@@ -6,7 +6,7 @@ import { useCartStore } from '../store/useCartStore';
 import { PRODUCT_TABS, HOT_TAB } from '../constants/productCategories';
 import { HeroCarousel } from '../components/HeroCarousel';
 import { useCurrencyStore, formatPrice, regionPrice, isAvailable } from '../store/useCurrencyStore';
-import { cn } from '../lib/utils';
+import { cn, imgFallback } from '../lib/utils';
 
 export function ProductsPage() {
   const [activeTab, setActiveTab] = useState<string>('hot');
@@ -58,7 +58,9 @@ export function ProductsPage() {
             productsApi.bestsellers(),
           ]);
           if (!cancelled) {
-            setFeatured(feat.products);
+            // Banner shows `featured`-tagged products; if the admin hasn't
+            // tagged any, fall back to the newest few so it's never empty.
+            setFeatured(feat.products.length > 0 ? feat.products : all.products.slice(0, 5));
             setGrid(all.products);
             setBest(bestRes.products);
           }
@@ -207,6 +209,7 @@ export function ProductsPage() {
                         <img
                           src={p.images[0]}
                           alt={p.name}
+                          onError={imgFallback}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           loading="lazy"
                         />
@@ -271,7 +274,7 @@ export function ProductsPage() {
                   >
                     <div className="aspect-square bg-paper-warm overflow-hidden">
                       {p.images[0] ? (
-                        <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                        <img src={p.images[0]} alt={p.name} onError={imgFallback} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center"><Package className="w-10 h-10 text-ink-hint" /></div>
                       )}

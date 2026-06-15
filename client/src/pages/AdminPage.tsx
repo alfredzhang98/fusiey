@@ -17,7 +17,7 @@ import {
 import { PRODUCT_CATEGORIES } from '../constants/productCategories';
 import { PALETTES } from '../constants/palettes';
 import { renderThumbnail } from '../utils/patternThumbnail';
-import { cn } from '../lib/utils';
+import { cn, imgFallback } from '../lib/utils';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 type Tab = 'dashboard' | 'products' | 'orders' | 'accounting' | 'settings' | 'media';
@@ -690,7 +690,7 @@ function ProductManager() {
     <div key={p.id} className={cn('fsy-sticker bg-paper rounded-[14px] p-4 flex items-center gap-4', !p.isActive && 'opacity-70')}>
       <div className="w-14 h-14 rounded-[10px] bg-paper-warm border border-ink/30 overflow-hidden shrink-0">
         {p.images[0] ? (
-          <img src={p.images[0]} alt="" className="w-full h-full object-cover" />
+          <img src={p.images[0]} alt="" onError={imgFallback} className="w-full h-full object-cover" />
         ) : (
           <Package className="w-6 h-6 text-ink-hint m-4" />
         )}
@@ -851,6 +851,7 @@ function ProductForm({
     initial?.patternFileUrl ? { url: initial.patternFileUrl, type: (initial.patternFileType as any) || 'pdf' } : null,
   );
   const [patternMsg, setPatternMsg] = useState<string | null>(null);
+  const [patternPct, setPatternPct] = useState<number | null>(null);
   const [flowOpen, setFlowOpen] = useState(false);
   const isPattern = category === 'pattern';
   // "Customisable" only makes sense for the add-on categories that appear in
@@ -925,15 +926,18 @@ function ProductForm({
   };
 
   const onPatternFile = async (file: File) => {
-    setPatternMsg('Uploading…');
+    setPatternMsg(null);
+    setPatternPct(0);
     try {
-      const res = await productsApi.uploadPatternFile(file);
+      const res = await productsApi.uploadPatternFile(file, setPatternPct);
       setPatternFile(res);
       setPatternMsg(`✓ ${res.type.toUpperCase()} uploaded`);
       setError(null);
     } catch (err: any) {
       setPatternMsg(null);
       setError(err.message || 'Upload failed');
+    } finally {
+      setPatternPct(null);
     }
   };
 
@@ -1119,7 +1123,16 @@ function ProductForm({
                   ✓ <a href={patternFile.url} target="_blank" rel="noreferrer" className="underline">{patternFile.type.toUpperCase()} on file</a> (upload to replace)
                 </p>
               )}
-              {patternMsg && !patternFile && <p className="font-body text-[11px] text-ink-soft">{patternMsg}</p>}
+              {patternPct !== null ? (
+                <div className="max-w-xs">
+                  <div className="h-2 rounded-full bg-ink/10 border border-ink/20 overflow-hidden">
+                    <div className="h-full bg-cotton transition-[width] duration-150" style={{ width: `${patternPct}%` }} />
+                  </div>
+                  <p className="font-body text-[11px] text-ink-soft mt-1">Uploading… {patternPct}%</p>
+                </div>
+              ) : (
+                patternMsg && !patternFile && <p className="font-body text-[11px] text-ink-soft">{patternMsg}</p>
+              )}
             </div>
           )}
         </div>
@@ -1238,6 +1251,7 @@ function MediaLibrary() {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<MediaFolder | null>(null);
 
@@ -1251,11 +1265,11 @@ function MediaLibrary() {
   };
   const upload = async (files: FileList | null) => {
     if (!files || !m.openFolder) return;
-    setUploading(true); m.setError(null);
+    setUploading(true); setUploadPct(0); m.setError(null);
     try {
-      await mediaApi.uploadAssets(m.openFolder.id, Array.from(files));
+      await mediaApi.uploadAssets(m.openFolder.id, Array.from(files), setUploadPct);
       m.loadAssets(m.openFolder);
-    } catch (err: any) { m.setError(err.message); } finally { setUploading(false); }
+    } catch (err: any) { m.setError(err.message); } finally { setUploading(false); setUploadPct(null); }
   };
   const copy = (url: string) => {
     navigator.clipboard?.writeText(window.location.origin + url).catch(() => {});
@@ -1330,6 +1344,14 @@ function MediaLibrary() {
               </button>
             </div>
           </div>
+          {uploadPct !== null && (
+            <div className="max-w-xs">
+              <div className="h-2 rounded-full bg-ink/10 border border-ink/20 overflow-hidden">
+                <div className="h-full bg-cotton transition-[width] duration-150" style={{ width: `${uploadPct}%` }} />
+              </div>
+              <p className="font-body text-[11px] text-ink-soft mt-1">Uploading… {uploadPct}%</p>
+            </div>
+          )}
           <div className="flex flex-wrap gap-3">
             {m.assets.map((a) => (
               <div key={a.id} className="relative w-24 h-24 rounded-[10px] border-[2px] border-ink/30 overflow-hidden group">
@@ -1368,6 +1390,7 @@ function MediaPicker({ remaining, onPick, onClose }: {
   const m = useMediaBrowser(PRODUCT_CATEGORIES[0].key);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
 
   const toggle = (url: string) => setSelected((prev) => {
     const next = new Set(prev);
@@ -1377,9 +1400,9 @@ function MediaPicker({ remaining, onPick, onClose }: {
   });
   const upload = async (files: FileList | null) => {
     if (!files || !m.openFolder) return;
-    setUploading(true); m.setError(null);
+    setUploading(true); setUploadPct(0); m.setError(null);
     try {
-      const res = await mediaApi.uploadAssets(m.openFolder.id, Array.from(files));
+      const res = await mediaApi.uploadAssets(m.openFolder.id, Array.from(files), setUploadPct);
       m.loadAssets(m.openFolder);
       // auto-select freshly uploaded (within remaining budget)
       setSelected((prev) => {
@@ -1387,7 +1410,7 @@ function MediaPicker({ remaining, onPick, onClose }: {
         for (const a of res.assets) if (next.size < remaining) next.add(a.url);
         return next;
       });
-    } catch (err: any) { m.setError(err.message); } finally { setUploading(false); }
+    } catch (err: any) { m.setError(err.message); } finally { setUploading(false); setUploadPct(null); }
   };
 
   return (
@@ -1419,6 +1442,14 @@ function MediaPicker({ remaining, onPick, onClose }: {
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Upload into "{m.openFolder.name}"
               <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
             </label>
+            {uploadPct !== null && (
+              <div className="max-w-xs">
+                <div className="h-2 rounded-full bg-ink/10 border border-ink/20 overflow-hidden">
+                  <div className="h-full bg-cotton transition-[width] duration-150" style={{ width: `${uploadPct}%` }} />
+                </div>
+                <p className="font-body text-[11px] text-ink-soft mt-1">Uploading… {uploadPct}%</p>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               {m.assets.map((a) => {
                 const on = selected.has(a.url);
