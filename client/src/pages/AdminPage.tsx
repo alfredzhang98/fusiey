@@ -631,6 +631,7 @@ function ProductManager() {
   const [editing, setEditing] = useState<ProductItem | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProductItem | null>(null);
+  const [purgeTarget, setPurgeTarget] = useState<ProductItem | null>(null);
 
   const fetchProducts = async () => {
     try {
@@ -661,6 +662,18 @@ function ProductManager() {
   const reactivate = async (p: ProductItem) => {
     try {
       await productsApi.update(p.id, { isActive: true });
+      fetchProducts();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const confirmPurge = async () => {
+    if (!purgeTarget) return;
+    const id = purgeTarget.id;
+    setPurgeTarget(null);
+    try {
+      await productsApi.permanentRemove(id); // hard-delete from the database
       fetchProducts();
     } catch (err: any) {
       setError(err.message);
@@ -716,13 +729,22 @@ function ProductManager() {
             <Trash2 className="w-4 h-4 text-red-500" />
           </button>
         ) : (
-          <button
-            onClick={() => reactivate(p)}
-            title="Relist (show in shop)"
-            className="w-9 h-9 rounded-full border border-ink/30 flex items-center justify-center hover:bg-mint/40 transition-colors"
-          >
-            <RotateCcw className="w-4 h-4 text-ink" />
-          </button>
+          <>
+            <button
+              onClick={() => reactivate(p)}
+              title="Relist (show in shop)"
+              className="w-9 h-9 rounded-full border border-ink/30 flex items-center justify-center hover:bg-mint/40 transition-colors"
+            >
+              <RotateCcw className="w-4 h-4 text-ink" />
+            </button>
+            <button
+              onClick={() => setPurgeTarget(p)}
+              title="Delete permanently (remove from database)"
+              className="w-9 h-9 rounded-full border border-ink/30 flex items-center justify-center hover:bg-red-50 transition-colors"
+            >
+              <Trash2 className="w-4 h-4 text-red-500" />
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -780,6 +802,15 @@ function ProductManager() {
         confirmLabel="Unlist"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={!!purgeTarget}
+        title="Delete permanently?"
+        message={`"${purgeTarget?.name ?? ''}" will be removed from the database for good — this can't be undone. (Products that appear in past orders can't be deleted and should stay unlisted.)`}
+        confirmLabel="Delete forever"
+        onConfirm={confirmPurge}
+        onCancel={() => setPurgeTarget(null)}
       />
     </div>
   );

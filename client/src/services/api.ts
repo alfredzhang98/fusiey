@@ -300,6 +300,8 @@ export const productsApi = {
   update: (id: string, body: ProductWriteBody) =>
     request<ProductItem>(`/products/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   remove: (id: string) => request<void>(`/products/${id}`, { method: 'DELETE' }),
+  /** Permanently delete a product (and its pattern file). Blocked if it has orders. */
+  permanentRemove: (id: string) => request<void>(`/products/${id}/permanent`, { method: 'DELETE' }),
   /** Upload a non-certified pattern deliverable (PDF or PNG). */
   uploadPatternFile: (file: File) => {
     const form = new FormData();

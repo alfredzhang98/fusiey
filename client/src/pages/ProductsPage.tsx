@@ -49,14 +49,17 @@ export function ProductsPage() {
           const res = await productsApi.list({ search: query, sort, limit: 48 });
           if (!cancelled) { setFeatured([]); setGrid(res.products); }
         } else if (isHot) {
-          const [feat, hot, bestRes] = await Promise.all([
+          // Hot is the landing view — it shows the full catalogue (newest first)
+          // so every product is reachable, with a `featured` carousel and a
+          // bestsellers strip layered on top.
+          const [feat, all, bestRes] = await Promise.all([
             productsApi.list({ tag: 'featured', limit: 8 }),
-            productsApi.list({ tag: 'hot', limit: 24 }),
+            productsApi.list({ limit: 48, sort: 'newest' }),
             productsApi.bestsellers(),
           ]);
           if (!cancelled) {
             setFeatured(feat.products);
-            setGrid(hot.products);
+            setGrid(all.products);
             setBest(bestRes.products);
           }
         } else {

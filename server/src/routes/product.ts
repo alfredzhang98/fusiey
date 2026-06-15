@@ -16,7 +16,7 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { patternFolderDir, ensureDir, safeFilename, publicUrl } from '../lib/storage.js';
+import { patternFolderDir, ensureDir, safeFilename, publicUrl, absFromPublicUrl } from '../lib/storage.js';
 
 export const productRoutes = Router();
 
@@ -248,9 +248,13 @@ productRoutes.post('/', async (req, res) => {
 });
 
 // ── POST /products/pattern-file (admin) — upload a non-certified PDF/PNG ──
+// Pattern PDFs (esp. high-resolution multi-page charts) can be large. Cap at
+// 60MB so any file a user considers "within 50MB" always fits (file managers
+// round, so a "50MB" file can be ~53M bytes). Exceeding it throws a MulterError
+// that the error handler maps to a clear 413 (not a 500).
 const patternFileUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: 60 * 1024 * 1024 },
 });
 
 productRoutes.post('/pattern-file', patternFileUpload.single('file'), async (req, res) => {
@@ -300,5 +304,31 @@ productRoutes.delete('/:id', async (req, res) => {
     where: { id: req.params.id },
     data: { isActive: false },
   });
+  return res.status(204).end();
+});
+
+// ── DELETE /products/:id/permanent (admin — hard delete) ────────────────
+// Removes the product row entirely AND its uploaded pattern file. Blocked when
+// the product is referenced by an order (we must keep it for order history —
+// it should stay unlisted instead).
+
+productRoutes.delete('/:id/permanent', async (req, res) => {
+  const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+
+  const orderCount = await prisma.orderItem.count({ where: { productId: existing.id } });
+  if (orderCount > 0) {
+    return res.status(409).json({
+      error: 'This product appears in past orders and can\'t be permanently deleted. Keep it unlisted instead.',
+    });
+  }
+
+  // Best-effort cleanup of the non-certified pattern file on disk.
+  if (existing.patternFileUrl) {
+    const abs = absFromPublicUrl(existing.patternFileUrl);
+    if (abs) { try { fs.unlinkSync(abs); } catch { /* ignore */ } }
+  }
+
+  await prisma.product.delete({ where: { id: existing.id } });
   return res.status(204).end();
 });
