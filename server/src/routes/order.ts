@@ -23,9 +23,9 @@ const addressSchema = z.object({
   line1: z.string().min(1).max(200),
   line2: z.string().max(200).optional(),
   city: z.string().min(1).max(100),
-  county: z.string().max(100).optional(),
-  postcode: z.string().min(1).max(20),
-  country: z.literal('GB'),
+  county: z.string().max(100).optional(), // county (GB) / state (US)
+  postcode: z.string().min(1).max(20),    // postcode (GB) / ZIP (US)
+  country: z.enum(['GB', 'US']),
 });
 
 const orderItemSchema = z.object({

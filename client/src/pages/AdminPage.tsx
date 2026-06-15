@@ -1700,7 +1700,14 @@ function OrderRow({ order, onPatch }: { order: OrderDetail; onPatch: (id: string
 
           {order.shippingAddress && (
             <p className="font-body text-ink-hint text-xs">
-              Ship to: {order.shippingAddress.line1}, {order.shippingAddress.city}, {order.shippingAddress.postcode}
+              Ship to: {[
+                order.shippingAddress.line1,
+                order.shippingAddress.line2,
+                order.shippingAddress.city,
+                order.shippingAddress.county,
+                order.shippingAddress.postcode,
+                order.shippingAddress.country,
+              ].filter(Boolean).join(', ')}
             </p>
           )}
 
@@ -1711,7 +1718,7 @@ function OrderRow({ order, onPatch }: { order: OrderDetail; onPatch: (id: string
               <span className="text-ink">Discount −{sym}{order.discountAmount.toFixed(2)}{order.discountCode ? ` (${order.discountCode})` : ''}</span>
             )}
             {order.shippingAmount != null && <span>Shipping {sym}{order.shippingAmount.toFixed(2)}</span>}
-            {order.vatAmount != null && <span>VAT {sym}{order.vatAmount.toFixed(2)}</span>}
+            {!!order.vatAmount && <span>VAT {sym}{order.vatAmount.toFixed(2)}</span>}
             <span className="font-semibold text-ink">Total {sym}{order.totalAmount.toFixed(2)}</span>
           </div>
 

@@ -30,9 +30,9 @@ const addressSchema = z.object({
   line1: z.string().min(1).max(200),
   line2: z.string().max(200).optional(),
   city: z.string().min(1).max(100),
-  county: z.string().max(100).optional(),
-  postcode: z.string().min(1).max(20),
-  country: z.literal('GB'),
+  county: z.string().max(100).optional(), // county (GB) / state (US)
+  postcode: z.string().min(1).max(20),    // postcode (GB) / ZIP (US)
+  country: z.enum(['GB', 'US']),
 });
 
 const checkoutSchema = z.object({
@@ -121,8 +121,9 @@ async function priceCart(items: CheckoutInput['items'], currency: Region, discou
   const ship = shippingCfg[currency];
   const shipping = (allDigital || discountedGoods >= ship.freeOver) ? 0 : ship.fee;
   const total = round2(discountedGoods + shipping);
-  // VAT is inclusive in the displayed prices: net = total / 1.2, vat = total − net.
-  const vatAmount = round2(total - total / (1 + VAT_RATE));
+  // VAT applies to UK (GBP) orders only — prices are VAT-inclusive there. USD
+  // prices carry no UK VAT, so the breakdown is 0 for US orders.
+  const vatAmount = currency === 'GBP' ? round2(total - total / (1 + VAT_RATE)) : 0;
 
   return {
     subtotal,

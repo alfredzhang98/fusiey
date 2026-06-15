@@ -70,6 +70,9 @@ export function CheckoutPage() {
   // Digital-only cart (e.g. patterns) needs no shipping address — this is what
   // lets international (e.g. US) customers buy a pattern.
   const allDigital = items.length > 0 && items.every((i) => i.category === 'pattern');
+  // Ship-to country follows the region/currency (USD → US, GBP → UK).
+  const country: 'GB' | 'US' = currency === 'USD' ? 'US' : 'GB';
+  const isUS = country === 'US';
   const sub = subtotal(currency);
   const discountAmount = round2(sub * (percentOff / 100));
   const discountedGoods = round2(sub - discountAmount);
@@ -108,8 +111,13 @@ export function CheckoutPage() {
     if (!address.city.trim()) errors.city = 'Required';
     if (!address.postcode.trim()) errors.postcode = 'Required';
     const ukPostcode = /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/i;
-    if (address.postcode.trim() && !ukPostcode.test(address.postcode.trim())) {
-      errors.postcode = 'Invalid UK postcode (e.g. SW1A 1AA)';
+    const usZip = /^\d{5}(-\d{4})?$/;
+    if (address.postcode.trim()) {
+      if (isUS && !usZip.test(address.postcode.trim())) {
+        errors.postcode = 'Invalid US ZIP code (e.g. 90210)';
+      } else if (!isUS && !ukPostcode.test(address.postcode.trim())) {
+        errors.postcode = 'Invalid UK postcode (e.g. SW1A 1AA)';
+      }
     }
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -129,7 +137,7 @@ export function CheckoutPage() {
       city: address.city.trim(),
       county: address.county.trim() || undefined,
       postcode: address.postcode.trim().toUpperCase(),
-      country: 'GB' as const,
+      country,
     },
     notes: notes.trim() || undefined,
     discountCode: appliedCode || undefined,
@@ -146,10 +154,9 @@ export function CheckoutPage() {
       const payload = buildPayload();
       // Convenience: for physical test orders, fill a default address if blank.
       if (!allDigital && !payload.shippingAddress?.line1) {
-        payload.shippingAddress = {
-          line1: 'Admin test address', line2: undefined, city: 'London',
-          county: undefined, postcode: 'SW1A 1AA', country: 'GB',
-        };
+        payload.shippingAddress = isUS
+          ? { line1: 'Admin test address', line2: undefined, city: 'New York', county: 'NY', postcode: '10001', country: 'US' }
+          : { line1: 'Admin test address', line2: undefined, city: 'London', county: undefined, postcode: 'SW1A 1AA', country: 'GB' };
       }
       const hadPattern = items.some((i) => i.category === 'pattern');
       await paymentsApi.freeOrder(payload);
@@ -292,24 +299,24 @@ export function CheckoutPage() {
                     {validationErrors.city && <span className="text-red-500">{validationErrors.city}</span>}
                   </label>
                   <label className="flex flex-col gap-1 font-body text-xs text-ink-soft">
-                    County
+                    {isUS ? 'State' : 'County'}
                     <input
                       type="text"
                       value={address.county}
                       onChange={(e) => setAddress((a) => ({ ...a, county: e.target.value }))}
                       className="fsy-input"
-                      placeholder="Greater London"
+                      placeholder={isUS ? 'NY' : 'Greater London'}
                     />
                   </label>
                 </div>
                 <label className="flex flex-col gap-1 font-body text-xs text-ink-soft">
-                  Postcode *
+                  {isUS ? 'ZIP code *' : 'Postcode *'}
                   <input
                     type="text"
                     value={address.postcode}
                     onChange={(e) => setAddress((a) => ({ ...a, postcode: e.target.value.toUpperCase() }))}
                     className={fieldClass('postcode')}
-                    placeholder="SW1A 1AA"
+                    placeholder={isUS ? '90210' : 'SW1A 1AA'}
                     maxLength={10}
                   />
                   {validationErrors.postcode && <span className="text-red-500">{validationErrors.postcode}</span>}
@@ -487,9 +494,11 @@ export function CheckoutPage() {
                   <span>Total</span>
                   <span>{formatPrice(total, currency)}</span>
                 </div>
-                <p className="text-ink-hint text-[11px] text-right">
-                  Includes VAT (20%): {formatPrice(vatPortion(total), currency)}
-                </p>
+                {currency === 'GBP' && (
+                  <p className="text-ink-hint text-[11px] text-right">
+                    Includes VAT (20%): {formatPrice(vatPortion(total), currency)}
+                  </p>
+                )}
               </div>
 
               {/* Payment */}
