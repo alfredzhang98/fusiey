@@ -278,6 +278,8 @@ export const patternsApi = {
   },
   /** Non-certified (download) pattern purchases shown in My Works. */
   purchases: () => request<{ purchases: PatternPurchase[] }>('/patterns/purchases'),
+  /** Pattern product ids the user already owns (to warn against re-buying). */
+  owned: () => request<{ productIds: string[] }>('/patterns/owned'),
   /** URL of a pattern's cached thumbnail image (used as <img src>). */
   thumbnailUrl: (id: string) => `/api/patterns/${id}/thumbnail`,
   get: (id: string) => request<{ pattern: PatternDetail }>(`/patterns/${id}`),

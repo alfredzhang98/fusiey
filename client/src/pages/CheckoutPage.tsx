@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Minus, Plus, Trash2, ShoppingCart, ArrowLeft,
-  Loader2, CreditCard, MapPin, CheckCircle, Tag,
+  Loader2, CreditCard, MapPin, CheckCircle, Tag, BookMarked, AlertTriangle,
 } from 'lucide-react';
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 import { motion, AnimatePresence } from 'motion/react';
 import { useCartStore, unitPriceFor } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useCurrencyStore, formatPrice, vatPortion } from '../store/useCurrencyStore';
-import { paymentsApi, configApi, ApiError, type ShippingConfig } from '../services/api';
+import { paymentsApi, patternsApi, configApi, ApiError, type ShippingConfig } from '../services/api';
 
 const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID || '';
 
@@ -33,6 +33,8 @@ export function CheckoutPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [boughtPattern, setBoughtPattern] = useState(false);
+  const [ownedPatternIds, setOwnedPatternIds] = useState<Set<string>>(new Set());
   const [validationErrors, setValidationErrors] = useState<Partial<Record<keyof AddressForm, string>>>({});
 
   // ── Discount code ──────────────────────────────────────────────────
@@ -50,6 +52,17 @@ export function CheckoutPage() {
   useEffect(() => {
     configApi.shipping().then(setShippingCfg).catch(() => { /* keep defaults */ });
   }, []);
+
+  // Patterns the user already owns — to warn against paying for a duplicate.
+  useEffect(() => {
+    if (!user) { setOwnedPatternIds(new Set()); return; }
+    patternsApi.owned()
+      .then((r) => setOwnedPatternIds(new Set(r.productIds)))
+      .catch(() => { /* non-blocking */ });
+  }, [user]);
+
+  // Pattern lines in the cart the user has already purchased.
+  const ownedInCart = items.filter((i) => i.category === 'pattern' && ownedPatternIds.has(i.productId));
 
   const round2 = (n: number) => Math.round(n * 100) / 100;
   // Items not sold in the active region (no price for this currency).
@@ -134,10 +147,12 @@ export function CheckoutPage() {
           county: undefined, postcode: 'SW1A 1AA', country: 'GB',
         };
       }
+      const hadPattern = items.some((i) => i.category === 'pattern');
       await paymentsApi.freeOrder(payload);
+      setBoughtPattern(hadPattern);
       clearCart();
       setSuccess(true);
-      setTimeout(() => navigate('/orders'), 2000);
+      setTimeout(() => navigate(hadPattern ? '/my-works' : '/orders'), 2200);
     } catch (err: any) {
       setError(err instanceof ApiError ? err.message : 'Could not place the test order.');
     } finally {
@@ -150,10 +165,12 @@ export function CheckoutPage() {
     setBusy(true);
     setError(null);
     try {
+      const hadPattern = items.some((i) => i.category === 'pattern');
       await paymentsApi.capturePaypalOrder({ ...buildPayload(), paypalOrderId });
+      setBoughtPattern(hadPattern);
       clearCart();
       setSuccess(true);
-      setTimeout(() => navigate('/orders'), 2000);
+      setTimeout(() => navigate(hadPattern ? '/my-works' : '/orders'), 2200);
     } catch (err: any) {
       setError(err instanceof ApiError ? err.message : 'Payment went through but we could not save your order — please contact support.');
     } finally {
@@ -174,9 +191,21 @@ export function CheckoutPage() {
           <CheckCircle className="w-10 h-10 text-ink" />
         </motion.div>
         <h2 className="font-cute font-bold text-ink text-2xl mb-2">Order placed!</h2>
-        <p className="font-body text-ink-hint mb-6">
-          Redirecting to your orders…
-        </p>
+        {boughtPattern ? (
+          <>
+            <p className="font-body text-ink-soft mb-2">
+              Your pattern has been added to <strong>My Works</strong> — download it there anytime.
+            </p>
+            <p className="font-body text-ink-hint text-sm mb-6">Taking you to My Works…</p>
+            <Link to="/my-works" className="fsy-btn bg-cotton gap-2">
+              <BookMarked className="w-4 h-4" /> Go to My Works
+            </Link>
+          </>
+        ) : (
+          <p className="font-body text-ink-hint mb-6">
+            Redirecting to your orders…
+          </p>
+        )}
       </div>
     );
   }
@@ -464,6 +493,19 @@ export function CheckoutPage() {
                 {unavailable.length > 0 && (
                   <div className="p-3 bg-cotton/30 border border-ink/40 rounded-[10px] text-ink font-body text-xs">
                     Some items aren't available in your region ({currency}). Remove them to continue.
+                  </div>
+                )}
+
+                {ownedInCart.length > 0 && (
+                  <div className="p-3 bg-butter/60 border-[2px] border-ink/30 rounded-[10px] text-ink font-body text-xs space-y-1.5">
+                    <p className="font-cute font-semibold inline-flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4" /> You already own these patterns
+                    </p>
+                    <p className="text-ink-soft">
+                      {ownedInCart.map((i) => i.productName).join(', ')} — already in your{' '}
+                      <Link to="/my-works" className="underline font-semibold">My Works</Link>.
+                      Checking out again will charge you for a duplicate.
+                    </p>
                   </div>
                 )}
 

@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Minus, Plus, ShoppingCart, Check, Loader2,
-  Package, Sparkles, Flame, Truck,
+  Package, Sparkles, Flame, Truck, BookMarked,
 } from 'lucide-react';
-import { productsApi, configApi, type ProductItem, type ShippingConfig } from '../services/api';
+import { productsApi, configApi, patternsApi, type ProductItem, type ShippingConfig } from '../services/api';
 import { useCartStore } from '../store/useCartStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { PRODUCT_CATEGORIES } from '../constants/productCategories';
 import { useCurrencyStore, formatPrice, vatPortion, regionPrice } from '../store/useCurrencyStore';
 import { cn, imgFallback } from '../lib/utils';
@@ -16,6 +17,7 @@ export function ProductDetailPage() {
   const addItem = useCartStore((s) => s.addItem);
   const itemCount = useCartStore((s) => s.itemCount());
   const currency = useCurrencyStore((s) => s.currency);
+  const user = useAuthStore((s) => s.user);
 
   const [product, setProduct] = useState<ProductItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,6 +25,7 @@ export function ProductDetailPage() {
   const [imgIdx, setImgIdx] = useState(0);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const [alreadyOwned, setAlreadyOwned] = useState(false);
   const [shippingCfg, setShippingCfg] = useState<ShippingConfig>({
     GBP: { freeOver: 50, fee: 4.99 },
     USD: { freeOver: 65, fee: 6.99 },
@@ -49,6 +52,18 @@ export function ProductDetailPage() {
     })();
     return () => { cancelled = true; };
   }, [id]);
+
+  // For digital patterns, check whether the signed-in user already owns it, so
+  // we can steer them to My Works instead of letting them pay twice.
+  useEffect(() => {
+    setAlreadyOwned(false);
+    if (!product || product.category !== 'pattern' || !user) return;
+    let cancelled = false;
+    patternsApi.owned()
+      .then((r) => { if (!cancelled) setAlreadyOwned(r.productIds.includes(product.id)); })
+      .catch(() => { /* non-blocking */ });
+    return () => { cancelled = true; };
+  }, [product, user]);
 
   const handleAdd = () => {
     if (!product) return;
@@ -185,8 +200,23 @@ export function ProductDetailPage() {
             {product.description}
           </p>
 
+          {/* Already-owned pattern — steer to My Works instead of re-buying */}
+          {alreadyOwned && (
+            <div className="mt-2 p-3 bg-mint/40 border-[2px] border-ink/20 rounded-[12px] space-y-2">
+              <p className="font-cute font-semibold text-ink text-sm inline-flex items-center gap-1.5">
+                <Check className="w-4 h-4" /> You already own this pattern
+              </p>
+              <p className="font-body text-ink-soft text-xs">
+                It's in your My Works — open it there to download. Buying again will charge you for a duplicate.
+              </p>
+              <Link to="/my-works" className="fsy-btn fsy-btn-sm bg-paper gap-1.5">
+                <BookMarked className="w-4 h-4" /> Open in My Works
+              </Link>
+            </div>
+          )}
+
           {/* Quantity + add to cart */}
-          {!soldOut && available && (
+          {!soldOut && available && !alreadyOwned && (
             <div className="flex items-center gap-3 mt-2">
               <div className="flex items-center gap-1 p-1 bg-paper border-[2px] border-ink rounded-pill">
                 <button

@@ -21,6 +21,7 @@ export interface CartItem {
   productId: string;
   productName: string;
   productImage: string;
+  category?: string;
   priceGBP: number;
   priceUSD: number | null;
   patternId?: string;
@@ -86,6 +87,7 @@ export const useCartStore = create<CartState>((set, get) => ({
             productId: product.id,
             productName: product.name,
             productImage: product.images[0] || '',
+            category: product.category,
             priceGBP: product.priceGBP,
             priceUSD: product.priceUSD,
             patternId,

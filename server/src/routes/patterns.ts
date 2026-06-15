@@ -141,6 +141,25 @@ patternRoutes.get('/purchases', async (req, res) => {
   });
 });
 
+// ── GET /patterns/owned — pattern product ids the user already owns ──────
+// Used to warn against re-buying a digital pattern they've already purchased
+// (covers both downloadable purchases and certified copies in My Works).
+// Defined before /:id so "owned" isn't captured as an id.
+patternRoutes.get('/owned', async (req, res) => {
+  const userId = req.user!.id;
+  const [downloads, certified] = await Promise.all([
+    prisma.patternPurchase.findMany({ where: { userId }, select: { productId: true } }),
+    prisma.savedPattern.findMany({
+      where: { userId, sourceProductId: { not: null } },
+      select: { sourceProductId: true },
+    }),
+  ]);
+  const ids = new Set<string>();
+  downloads.forEach((d) => ids.add(d.productId));
+  certified.forEach((c) => { if (c.sourceProductId) ids.add(c.sourceProductId); });
+  return res.json({ productIds: [...ids] });
+});
+
 // ── GET /patterns/:id/thumbnail — cached PNG, no base64 in list JSON ────
 patternRoutes.get('/:id/thumbnail', async (req, res) => {
   const pattern = await prisma.savedPattern.findUnique({
