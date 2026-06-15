@@ -468,6 +468,12 @@ export const paymentsApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  /** Admin only — place a free test order (no payment). Tagged admin_test. */
+  freeOrder: (body: PaypalCheckoutInput) =>
+    request<{ order: OrderDetail }>('/payments/free-order', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   /** Check a discount code before paying; returns percentOff if valid. */
   validateDiscount: (code: string) =>
     request<{ valid: boolean; code: string; percentOff: number }>('/payments/validate-discount', {

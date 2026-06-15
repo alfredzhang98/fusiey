@@ -11,7 +11,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 import { createPaypalOrder, capturePaypalOrder, isPaypalConfigured } from '../services/paypalService.js';
 import { getShippingConfig, type Region } from '../lib/shippingConfig.js';
 
@@ -187,6 +187,74 @@ async function deliverPatterns(tx: any, userId: string, deliverables: any[]) {
   }
 }
 
+/**
+ * Persist a paid order + deliver patterns in one transaction. Shared by the
+ * PayPal capture flow and the admin free/test-order flow. `decrementStock` and
+ * `burnDiscount` are off for test orders so repeated testing doesn't deplete
+ * real inventory or consume real discount codes.
+ */
+async function persistOrder(opts: {
+  userId: string;
+  items: CheckoutInput['items'];
+  priced: Awaited<ReturnType<typeof priceCart>>;
+  shippingAddress: CheckoutInput['shippingAddress'];
+  notes?: string;
+  currency: Region;
+  paymentMethod: string;
+  paymentId: string | null;
+  decrementStock?: boolean;
+  burnDiscount?: boolean;
+}) {
+  const { userId, items, priced, shippingAddress, notes, currency, paymentMethod, paymentId } = opts;
+  const decrementStock = opts.decrementStock ?? true;
+  const burnDiscount = opts.burnDiscount ?? true;
+  const { subtotal, discountAmount, shipping, vatAmount, total, orderItems, allDigital, discountId } = priced;
+
+  return prisma.$transaction(async (tx: any) => {
+    const addr = await tx.address.create({ data: { userId, ...shippingAddress } });
+    const created = await tx.order.create({
+      data: {
+        userId,
+        status: allDigital ? 'DELIVERED' : 'CONFIRMED',
+        subtotalAmount: subtotal,
+        discountAmount,
+        discountCode: priced.discountCode,
+        shippingAmount: shipping,
+        vatAmount,
+        totalAmount: total,
+        currency,
+        shippingAddressId: addr.id,
+        paymentMethod,
+        paymentId,
+        notes,
+        items: { create: orderItems },
+      },
+      include: {
+        items: { include: { product: { select: { name: true, images: true } } } },
+        shippingAddress: true,
+      },
+    });
+    if (decrementStock) {
+      for (const item of items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } },
+        });
+      }
+    }
+    // Burn the discount code so it can't be reused (one redemption per code).
+    if (burnDiscount && discountId) {
+      await tx.discountCode.update({
+        where: { id: discountId },
+        data: { used: true, usedAt: new Date(), orderId: created.id },
+      });
+    }
+    // Deliver purchased patterns into the buyer's My Works.
+    await deliverPatterns(tx, userId, priced.deliverables);
+    return created;
+  });
+}
+
 // ── POST /payments/paypal/create-order ──────────────────────────────────
 
 paymentRoutes.post('/paypal/create-order', async (req, res) => {
@@ -247,52 +315,52 @@ paymentRoutes.post('/paypal/capture-order', async (req, res) => {
     // Re-price from the DB and persist the order as paid. Digital-only orders
     // are delivered immediately (nothing to ship).
     const priced = await priceCart(items, currency, discountCode);
-    const { subtotal, discountAmount, shipping, vatAmount, total, orderItems, allDigital, discountId } = priced;
-
-    const order = await prisma.$transaction(async (tx: any) => {
-      const addr = await tx.address.create({ data: { userId: user.id, ...shippingAddress } });
-      const created = await tx.order.create({
-        data: {
-          userId: user.id,
-          status: allDigital ? 'DELIVERED' : 'CONFIRMED',
-          subtotalAmount: subtotal,
-          discountAmount,
-          discountCode: priced.discountCode,
-          shippingAmount: shipping,
-          vatAmount,
-          totalAmount: total,
-          currency,
-          shippingAddressId: addr.id,
-          paymentMethod: 'paypal',
-          paymentId: capture.captureId,
-          notes,
-          items: { create: orderItems },
-        },
-        include: {
-          items: { include: { product: { select: { name: true, images: true } } } },
-          shippingAddress: true,
-        },
-      });
-      for (const item of items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: item.quantity } },
-        });
-      }
-      // Burn the discount code so it can't be reused (one redemption per code).
-      if (discountId) {
-        await tx.discountCode.update({
-          where: { id: discountId },
-          data: { used: true, usedAt: new Date(), orderId: created.id },
-        });
-      }
-      // Deliver purchased patterns into the buyer's My Works.
-      await deliverPatterns(tx, user.id, priced.deliverables);
-      return created;
+    const order = await persistOrder({
+      userId: user.id,
+      items,
+      priced,
+      shippingAddress,
+      notes,
+      currency,
+      paymentMethod: 'paypal',
+      paymentId: capture.captureId,
     });
 
     return res.status(201).json({ order: { ...order, totalAmount: Number(order.totalAmount) } });
   } catch (err: any) {
     return res.status(400).json({ error: err.message || 'Failed to capture payment' });
+  }
+});
+
+// ── POST /payments/free-order (admin) — place a free test order, no payment ──
+// Lets admins (e.g. admin@fusiey.com) buy without paying, to exercise the full
+// order + pattern-delivery flow. Tagged paymentMethod='admin_test'; does NOT
+// touch real stock or burn discount codes.
+
+paymentRoutes.post('/free-order', requireRole('ADMIN', 'SUPERADMIN'), async (req, res) => {
+  const parsed = checkoutSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+  }
+  const user = req.user!;
+  const { items, shippingAddress, notes, discountCode, currency } = parsed.data;
+  try {
+    const priced = await priceCart(items, currency, discountCode);
+    const taggedNotes = `[ADMIN TEST] ${notes ?? ''}`.trim();
+    const order = await persistOrder({
+      userId: user.id,
+      items,
+      priced,
+      shippingAddress,
+      notes: taggedNotes,
+      currency,
+      paymentMethod: 'admin_test',
+      paymentId: null,
+      decrementStock: false,
+      burnDiscount: false,
+    });
+    return res.status(201).json({ order: { ...order, totalAmount: Number(order.totalAmount) } });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to place test order' });
   }
 });

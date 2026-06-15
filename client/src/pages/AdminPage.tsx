@@ -1665,6 +1665,7 @@ function OrderRow({ order, onPatch }: { order: OrderDetail; onPatch: (id: string
             <span className="font-cute font-bold text-ink text-sm">{sym}{order.totalAmount.toFixed(2)}</span>
             <span className="fsy-tag text-[9px]">{order.status}</span>
             {hasDesign && <span className="fsy-tag bg-mint text-[9px]">design pack</span>}
+            {order.paymentMethod === 'admin_test' && <span className="fsy-tag bg-butter text-[9px]">admin test</span>}
           </div>
           <div className="font-body text-ink-hint text-[11px] mt-1 truncate">
             {dateStr} · {preview}{order.user?.name ? ` · ${order.user.name}` : ''}

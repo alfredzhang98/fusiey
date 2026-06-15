@@ -119,6 +119,32 @@ export function CheckoutPage() {
     currency,
   });
 
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+
+  /** Admin only — place a free test order without paying. */
+  const handleFreeOrder = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const payload = buildPayload();
+      // Convenience: admins can place a test order without filling the address.
+      if (!payload.shippingAddress.line1) {
+        payload.shippingAddress = {
+          line1: 'Admin test address', line2: undefined, city: 'London',
+          county: undefined, postcode: 'SW1A 1AA', country: 'GB',
+        };
+      }
+      await paymentsApi.freeOrder(payload);
+      clearCart();
+      setSuccess(true);
+      setTimeout(() => navigate('/orders'), 2000);
+    } catch (err: any) {
+      setError(err instanceof ApiError ? err.message : 'Could not place the test order.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   /** Called after PayPal approves — capture the payment and persist the order. */
   const handleApprove = async (paypalOrderId: string) => {
     setBusy(true);
@@ -438,6 +464,23 @@ export function CheckoutPage() {
                 {unavailable.length > 0 && (
                   <div className="p-3 bg-cotton/30 border border-ink/40 rounded-[10px] text-ink font-body text-xs">
                     Some items aren't available in your region ({currency}). Remove them to continue.
+                  </div>
+                )}
+
+                {isAdmin && (
+                  <div className="space-y-1.5">
+                    <button
+                      type="button"
+                      onClick={handleFreeOrder}
+                      disabled={busy || unavailable.length > 0}
+                      className="fsy-btn fsy-btn-lg w-full bg-mint gap-2 disabled:opacity-50"
+                    >
+                      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      Place test order (admin · free)
+                    </button>
+                    <p className="font-body text-ink-hint text-[11px] text-center">
+                      Admin only — skips payment, tags the order as a test, and doesn't touch stock.
+                    </p>
                   </div>
                 )}
 
