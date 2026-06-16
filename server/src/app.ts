@@ -92,8 +92,15 @@ if (process.env.NODE_ENV === 'production') {
 // Error handling
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`[Fusiey] Server running on http://localhost:${PORT}`);
 });
+
+// Behind nginx/Cloudflare, Node's default 5s keep-alive lets the upstream reuse
+// a connection Node has just closed → intermittent reset surfacing as a 502/520.
+// Keep our keep-alive LONGER than the proxy's, with headersTimeout slightly
+// above keepAliveTimeout (Node requires this ordering).
+server.keepAliveTimeout = 65_000;
+server.headersTimeout = 66_000;
 
 export default app;
